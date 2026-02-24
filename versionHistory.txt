@@ -62,4 +62,11 @@ Version 0.40: Feature: Parallel GZIP/BZIP2 compression
               Feature: Added first JUnit tests
               Feature: Moved to Java 8
 
-
+Version 0.41: Fix: Bug in IlluminaClippingTrimmer calculateMaximumRange
+              Feature: Added extensive JUnit tests
+              Performance: Major optimizations in BarcodeSplitter (array-based lookups, loop unswitching, char[] comparison) and fix for short reads
+              Performance: Optimized Bzip2 compression (buffer pre-allocation) and CompressionFormat detection
+              Feature: Moved to Java 25
+              Feature: Replaced Jbzip2 with Apache Commons Compress (concatenated streams)
+              Feature: Updated dependencies (Mockito, ByteBuddy, JUnit)
+              Feature: Added verbose adapter reporting (-verbose flag)

@@ -9,6 +9,12 @@ A Java-based processing and trimming tool for Illumina NGS sequencing data, deve
 
 # Note 
 While the software is licensed under the GPL, the adapter sequences are *not* included in the GPL part, but owned by and used with permission of Illumina. Oligonucleotide sequences © 2023 Illumina, Inc. All rights reserved.
+
+# Citation
+If you use Trimmomatic in your research, please cite the Trimmomatic publication:
+
+> Anthony M. Bolger, Marc Lohse, Bjoern Usadel, Trimmomatic: a flexible trimmer for Illumina sequence data, *Bioinformatics*, Volume 30, Issue 15, August 2014, Pages 2114–2120, https://doi.org/10.1093/bioinformatics/btu170
+
 # Quick start
 ## Installation
 The easiest option is to download a binary release zip, and unpack it somewhere convenient. You'll need to modify the example command lines below to reference the trimmomatic JAR file and the location of the adapter fasta files. 
@@ -20,7 +26,7 @@ This software is provided as a service by the German Network for Bioinformatics 
 
 ## Build from Source
 
-To build Trimmomatic from source, you will need a Java Development Kit (JDK 8 or higher) and Apache Maven.
+To build Trimmomatic from source, you will need a Java Development Kit (JDK 25 or higher) and Apache Maven.
 
 Clone the repository, change into the top-level directory, and build using the following Maven command:
 
@@ -37,7 +43,7 @@ You often don't need leading and traling clipping. Also in general setting the `
 If you have questions please don't hesitate to contact us, this is not necessarily one size fits all. (e.g. RNAseq expression analysis vs DNA assembly).
 
 ```
-java -jar trimmomatic-0.39.jar PE \
+java -jar Trimmomatic-0.40.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -47,7 +53,7 @@ ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36
 for reference only (less sensitive for adapters)
 
 ```
-java -jar trimmomatic-0.39.jar PE \
+java -jar Trimmomatic-0.40.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -65,7 +71,7 @@ This will perform the following:
 ## Single End:
 To perform the same steps using a single-ended adapter file, run:
 ```
-java -jar trimmomatic-0.39.jar SE \
+java -jar Trimmomatic-0.40.jar SE \
 input.fq.gz \
 output.fq.gz \
 ILLUMINACLIP:TruSeq3-SE:2:30:10 \
@@ -102,7 +108,7 @@ Since version 0.27, trimmomatic can be executed using -jar. The 'old' method, us
 ## Paired End Mode:
 
 ```
-java -jar <path to trimmomatic.jar> PE [-threads <threads] [-phred33 | -phred64] \
+java -jar <path to trimmomatic.jar> PE [-threads <threads>] [-phred33 | -phred64] \
 [-trimlog <logFile>] [-summary <summaryFile>] [-basein <templateInputFile>] [-baseout <templateOutputFile>] \
 [-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
 <input 1> <input 2> \

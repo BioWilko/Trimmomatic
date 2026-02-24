@@ -3,13 +3,13 @@ package org.usadellab.trimmomatic.util.compression;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipInputStream;
 
-import org.itadaki.bzip2.BZip2InputStream;
-import org.itadaki.bzip2.BZip2OutputStream;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.usadellab.trimmomatic.util.Logger;
 
 public enum CompressionFormat {
@@ -19,13 +19,9 @@ public enum CompressionFormat {
 	private static Set<CompressionFormat> extSet;
 
 	static {
-		extSet = new HashSet<CompressionFormat>();
-
-		for (CompressionFormat cf : CompressionFormat.values()) {
-			if (cf.ext.length() > 0)
-				extSet.add(cf);
-		}
-
+		// Optimization: Use EnumSet for better performance
+		extSet = EnumSet.allOf(CompressionFormat.class);
+		extSet.remove(NONE);
 	}
 
 	private CompressionFormat(String ext) {
@@ -33,10 +29,10 @@ public enum CompressionFormat {
 	}
 
 	public static CompressionFormat forName(String name) {
-		String lcName = name.toLowerCase();
-
+		// Optimization: Avoid allocating a new String with toLowerCase()
 		for (CompressionFormat cf : extSet) {
-			if (lcName.endsWith(cf.ext))
+			// Case-insensitive suffix check
+			if (name.regionMatches(true, name.length() - cf.ext.length(), cf.ext, 0, cf.ext.length()))
 				return cf;
 		}
 
@@ -50,7 +46,7 @@ public enum CompressionFormat {
 		case GZIP:
 			return new ConcatGZIPInputStream(is);
 		case BZIP2:
-			return new BZip2InputStream(is, false);
+			return new BZip2CompressorInputStream(is, true);
 		case ZIP:
 			return new ZipInputStream(is);
 		default:
@@ -70,9 +66,9 @@ public enum CompressionFormat {
 				return new TunableGZIPOutputStream(os, compressLevel);
 		case BZIP2:
 			if (compressLevel == null)
-				return new BZip2OutputStream(os);
+				return new BZip2CompressorOutputStream(os);
 			else
-				return new BZip2OutputStream(os, compressLevel);
+				return new BZip2CompressorOutputStream(os, compressLevel);
 		default:
 			return os;
 		}
@@ -86,7 +82,7 @@ public enum CompressionFormat {
 		case GZIP:
 			return new GzipParallelCompressor(logger, compressLevel);
 		case BZIP2:
-			return new Bzip2ParallelCompressor(logger, compressLevel);
+			return new Bzip2ParallelCompressor(compressLevel);
 		default:
 			return null;
 		}

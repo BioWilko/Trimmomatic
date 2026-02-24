@@ -61,6 +61,7 @@ public class PairingValidator {
 						logger.warnln("         Reverse read: " + name2);
 					}
 
+					offset++;
 					return false;
 				}
 			} else {
@@ -71,6 +72,7 @@ public class PairingValidator {
 					logger.warnln("         Forward read: " + name1);
 					logger.warnln("         No more reverse reads");
 				}
+				offset++;
 				return false;
 
 			}
@@ -83,6 +85,7 @@ public class PairingValidator {
 				logger.warnln("         Reverse read: " + name2);
 			}
 
+			offset++;
 			return false;
 		}
 
