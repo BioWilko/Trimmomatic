@@ -13,7 +13,7 @@ While the software is licensed under the GPL, the adapter sequences are *not* in
 # Citation
 If you use Trimmomatic in your research, please cite the Trimmomatic publication:
 
-> Anthony M. Bolger, Marc Lohse, Bjoern Usadel, Trimmomatic: a flexible trimmer for Illumina sequence data, *Bioinformatics*, Volume 30, Issue 15, August 2014, Pages 2114–2120, https://doi.org/10.1093/bioinformatics/btu170
+> Anthony M. Bolger, Marc Lohse, Bjoern Usadel. Trimmomatic: a flexible trimmer for Illumina sequence data, *Bioinformatics*, Volume 30, Issue 15, August 2014, Pages 2114–2120, https://doi.org/10.1093/bioinformatics/btu170
 
 # Quick start
 ## Installation
@@ -33,6 +33,17 @@ Clone the repository, change into the top-level directory, and build using the f
 ```bash
 mvn clean package
 ```
+## Simplified Invocation (v0.41+)
+
+For standard cleaning of Illumina data, you can now invoke Trimmomatic with just the input files. Output files will be created in the same folder as the input files and named automatically (appending `.trimmed.fq.gz` for single read files or `.trimmed.paired.fq.gz` & `.trimmed.unpaired.fq.gz` for paired end read files), and standard trimming steps will be applied (`ILLUMINACLIP:TruSeq3-SE.fa` or `TruSeq3-PE-2-GGGGG.fa` `:2:30:10 SLIDINGWINDOW:4:20 MINLEN:36`). This mode also automatically detects and uses all available processor threads.
+
+```
+java -jar Trimmomatic-0.41.jar input.fq.gz
+```
+or
+```
+java -jar Trimmomatic-0.41.jar input_R1.fq.gz input_R2.fq.gz
+```
 
 ## Paired End:
 
@@ -43,7 +54,7 @@ You often don't need leading and traling clipping. Also in general setting the `
 If you have questions please don't hesitate to contact us, this is not necessarily one size fits all. (e.g. RNAseq expression analysis vs DNA assembly).
 
 ```
-java -jar Trimmomatic-0.40.jar PE \
+java -jar Trimmomatic-0.41.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -53,7 +64,7 @@ ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36
 for reference only (less sensitive for adapters)
 
 ```
-java -jar Trimmomatic-0.40.jar PE \
+java -jar Trimmomatic-0.41.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -71,7 +82,7 @@ This will perform the following:
 ## Single End:
 To perform the same steps using a single-ended adapter file, run:
 ```
-java -jar Trimmomatic-0.40.jar SE \
+java -jar Trimmomatic-0.41.jar SE \
 input.fq.gz \
 output.fq.gz \
 ILLUMINACLIP:TruSeq3-SE:2:30:10 \
@@ -110,7 +121,7 @@ Since version 0.27, trimmomatic can be executed using -jar. The 'old' method, us
 ```
 java -jar <path to trimmomatic.jar> PE [-threads <threads>] [-phred33 | -phred64] \
 [-trimlog <logFile>] [-summary <summaryFile>] [-basein <templateInputFile>] [-baseout <templateOutputFile>] \
-[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input 1> <input 2> \
 <paired output 1> <unpaired output 1> \
 <paired output 2> <unpaired output 2> \
@@ -122,7 +133,7 @@ or
 ```
 java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticPE [-threads <threads>] [-phred33 | -phred64] \
 [-trimlog <logFile>] [-summary <summaryFile>] [-basein <templateInputFile>] [-baseout <templateOutputFile>] \
-[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input 1> <input 2> \
 <paired output 1> <unpaired output 1> \
 <paired output 2> <unpaired output 2> \
@@ -132,7 +143,7 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticP
 
 ```
 java -jar <path to trimmomatic jar> SE [-threads <threads>] [-phred33 | -phred64] \
-[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input> <output> \
 <step 1> # Additional steps added as needed
 ```
@@ -141,7 +152,7 @@ or
 
 ```
 java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticSE [-threads <threads>] [-phred33 | -phred64] \
-[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input> <output> \
 <step 1> # Additional steps added as needed
 ```
@@ -160,6 +171,7 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticS
 * `-compressLevel <level>`: sets the compression level for BZIP2/GZ output files (1=fastest, 9=best compression).
 * `-compressStream` | `compressBlock`: specifies the compression mode. Block compression is the default.
 * `-quiet`: suppresses progress output to the console.
+* `-verbose`: enables detailed reporting of adapter removal statistics when using the ILLUMINACLIP step.
 * `-version`: prints the Trimmomatic version number to the console.
 
 ## Step options:

@@ -55,4 +55,11 @@ public class TrimmerFactoryIlluminaClipFailureTest {
 			}
 		}
 	}
+
+	@Test
+	public void testMissingAdapterFile() {
+		TrimmerFactory factory = new TrimmerFactory(mock(Logger.class));
+		String args = "ILLUMINACLIP:nonexistent_file_" + UUID.randomUUID() + ".fa:2:30:10";
+		assertThrows(IOException.class, () -> factory.makeTrimmer(args));
+	}
 }

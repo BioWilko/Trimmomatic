@@ -1,5 +1,6 @@
 package org.usadellab.trimmomatic;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -54,6 +55,25 @@ public class Trimmomatic {
 		return trimmers;
 	}
 
+	static String trimExtension(String filename) {
+		String extensions[] = { ".fq", ".fastq", ".txt", ".gz", ".bz2", ".zip" };
+
+		String tmp = filename;
+		boolean done = false;
+
+		while (!done) {
+			done = true;
+			for (String ext : extensions) {
+				if (tmp.endsWith(ext)) {
+					tmp = tmp.substring(0, tmp.length() - ext.length());
+					done = false;
+				}
+			}
+		}
+
+		return tmp;
+	}
+
 	/**
 	 * @param args
 	 */
@@ -73,6 +93,45 @@ public class Trimmomatic {
 			} else if (mode.equals("-version")) {
 				showVersion();
 				showUsage = false;
+			} else if (args.length == 1) {
+				File input = new File(args[0]);
+				String inputPath = input.getAbsolutePath();
+				String output = trimExtension(inputPath) + ".trimmed.fq.gz";
+
+				List<String> seArgs = new ArrayList<String>();
+				seArgs.add("-threads");
+				seArgs.add(String.valueOf(Runtime.getRuntime().availableProcessors()));
+				seArgs.add(inputPath);
+				seArgs.add(output);
+				seArgs.add("ILLUMINACLIP:TruSeq3-SE.fa:2:30:10");
+				seArgs.add("SLIDINGWINDOW:4:20");
+				seArgs.add("MINLEN:36");
+
+				if (TrimmomaticSE.run(seArgs.toArray(new String[0])))
+					showUsage = false;
+			} else if (args.length == 2) {
+				File input1 = new File(args[0]);
+				File input2 = new File(args[1]);
+				String input1Path = input1.getAbsolutePath();
+				String input2Path = input2.getAbsolutePath();
+				String base1 = trimExtension(input1Path);
+				String base2 = trimExtension(input2Path);
+
+				List<String> peArgs = new ArrayList<String>();
+				peArgs.add("-threads");
+				peArgs.add(String.valueOf(Runtime.getRuntime().availableProcessors()));
+				peArgs.add(input1Path);
+				peArgs.add(input2Path);
+				peArgs.add(base1 + ".trimmed.paired.fq.gz");
+				peArgs.add(base1 + ".trimmed.unpaired.fq.gz");
+				peArgs.add(base2 + ".trimmed.paired.fq.gz");
+				peArgs.add(base2 + ".trimmed.unpaired.fq.gz");
+				peArgs.add("ILLUMINACLIP:TruSeq3-PE-2-GGGGG.fa:2:30:10");
+				peArgs.add("SLIDINGWINDOW:4:20");
+				peArgs.add("MINLEN:36");
+
+				if (TrimmomaticPE.run(peArgs.toArray(new String[0])))
+					showUsage = false;
 			}
 		}
 
@@ -85,6 +144,8 @@ public class Trimmomatic {
 					"       SE [-version] [-threads <threads>] [-phred33|-phred64] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] <inputFile> <outputFile> <trimmer1>...");
 			System.err.println("   or: ");
 			System.err.println("       -version");
+			System.err.println("   or: ");
+			System.err.println("       <inputFile1> [inputFile2] (for automatic parameter selection)");
 			System.exit(1);
 		}
 	}

@@ -70,3 +70,4 @@ Version 0.41: Fix: Bug in IlluminaClippingTrimmer calculateMaximumRange
               Feature: Replaced Jbzip2 with Apache Commons Compress (concatenated streams)
               Feature: Updated dependencies (Mockito, ByteBuddy, JUnit)
               Feature: Added verbose adapter reporting (-verbose flag)
+              Feature: Simplified invocation mode with automatic output filenames and default trimming steps
