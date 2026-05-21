@@ -26,7 +26,7 @@ public class Bzip2ParallelCompressor implements ParallelCompressor {
 		if (current == null)
 			return null;
 
-		byte[] rawData = current.getData();
+		byte[] rawData = current.data();
 
 		if (rawData.length == 0)
 			return new Bzip2BlockData(new byte[0], 0, Collections.emptyList());

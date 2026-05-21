@@ -29,13 +29,13 @@ public class IlluminaClippingTrimmerPEvsSETest {
 		StringBuilder sb = new StringBuilder(seq.length());
 		for (int i = seq.length() - 1; i >= 0; i--) {
 			char c = seq.charAt(i);
-			switch (c) {
-			case 'A': sb.append('T'); break;
-			case 'C': sb.append('G'); break;
-			case 'G': sb.append('C'); break;
-			case 'T': sb.append('A'); break;
-			default: sb.append(c); break;
-			}
+			sb.append(switch (c) {
+				case 'A' -> 'T';
+				case 'C' -> 'G';
+				case 'G' -> 'C';
+				case 'T' -> 'A';
+				default -> c;
+			});
 		}
 		return sb.toString();
 	}

@@ -1,87 +1,47 @@
 package org.usadellab.trimmomatic.threading.serializer;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.usadellab.trimmomatic.util.compression.BlockData;
 import org.usadellab.trimmomatic.util.compression.UncompressedBlockData;
 
-public class SerializedBlock implements Future<BlockData> {
-	boolean last;
+public class SerializedBlock {
+    boolean last;
 
-	AtomicBoolean compressible;
-	AtomicBoolean done;
+    private final CompletableFuture<UncompressedBlockData> ucFuture = new CompletableFuture<>();
+    private final CompletableFuture<BlockData> dataFuture = new CompletableFuture<>();
 
-	UncompressedBlockData ucData;
-	BlockData data;
+    public SerializedBlock(boolean last) {
+        this.last = last;
+    }
 
-	public SerializedBlock(boolean last) {
-		this.last = last;
+    public boolean isLast() {
+        return last;
+    }
 
-		compressible = new AtomicBoolean();
-		done = new AtomicBoolean();
-	}
+    public void setUncompressedData(UncompressedBlockData ucData) {
+        ucFuture.complete(ucData);
+    }
 
-	public boolean isLast() {
-		return last;
-	}
+    public UncompressedBlockData getUncompressedData() {
+        return ucFuture.getNow(null);
+    }
 
-	public void setUncompressedData(UncompressedBlockData ucData) {
-		synchronized (this) {
-			this.ucData = ucData;
-			compressible.set(true);
-			notifyAll();
-		}
-	}
+    public boolean isCompressible() {
+        return ucFuture.isDone();
+    }
 
-	public UncompressedBlockData getUncompressedData() {
-		return ucData;
-	}
+    public void setData(BlockData data) {
+        dataFuture.complete(data);
+    }
 
-	public boolean isCompressible() {
-		return compressible.get();
-	}
+    public boolean isDone() {
+        return dataFuture.isDone();
+    }
 
-	public void setData(BlockData data) {
-		synchronized (this) {
-			this.data = data;
-			done.set(true);
-			notifyAll();
-		}
-	}
-
-	@Override
-	public boolean cancel(boolean mayInterruptIfRunning) {
-		return false;
-	}
-
-	@Override
-	public boolean isCancelled() {
-		return false;
-	}
-
-	@Override
-	public boolean isDone() {
-		return done.get();
-	}
-
-	@Override
-	public BlockData get() throws InterruptedException, ExecutionException {
-		synchronized (this) {
-			while (!isDone())
-				wait();
-
-			return data;
-		}
-	}
-
-	@Override
-	public BlockData get(long timeout, TimeUnit unit)
-			throws InterruptedException, ExecutionException, TimeoutException {
-		return null;
-	}
+    public BlockData get() throws InterruptedException, ExecutionException {
+        return dataFuture.get();
+    }
 
 }

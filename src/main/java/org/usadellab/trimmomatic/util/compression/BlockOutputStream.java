@@ -15,7 +15,7 @@ public class BlockOutputStream {
 	}
 
 	public void writeBlock(BlockData block) throws IOException {
-		stream.write(block.getData());
+		stream.write(block.data());
 	}
 
 	public void close() throws IOException {

@@ -19,8 +19,8 @@ public class SerializedBlockQueue {
 	public SerializedBlockQueue(int buffers, ParallelCompressor compressor) {
 		this.compressor = compressor; // Can be null
 
-		this.compressionQueue = new ArrayBlockingQueue<SerializedBlock>(buffers);
-		this.outputQueue = new ArrayBlockingQueue<SerializedBlock>(buffers);
+		this.compressionQueue = new ArrayBlockingQueue<SerializedBlock>(buffers * 2);
+		this.outputQueue = new ArrayBlockingQueue<SerializedBlock>(buffers * 2);
 	}
 
 	public ParallelCompressor getParallelCompressor() {

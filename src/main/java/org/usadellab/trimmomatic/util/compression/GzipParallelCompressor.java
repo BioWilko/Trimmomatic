@@ -51,7 +51,7 @@ public class GzipParallelCompressor implements ParallelCompressor {
 		if (current == null)
 			return;
 
-		byte[] currentData = current.getData();
+		byte[] currentData = current.data();
 
 		if (currentData.length > 0) {
 			length += currentData.length;
@@ -64,7 +64,7 @@ public class GzipParallelCompressor implements ParallelCompressor {
 		if (current == null)
 			return null;
 
-		byte[] rawData = current.getData();
+		byte[] rawData = current.data();
 
 		if (rawData.length == 0)
 			return new GzipBlockData(new byte[0]);
@@ -74,7 +74,7 @@ public class GzipParallelCompressor implements ParallelCompressor {
 			Deflater def = new Deflater(compressLevel, true);
 
 			if (previous != null)
-				def.setDictionary(previous.getData());
+				def.setDictionary(previous.data());
 
 			BlockCompressionHelper helper = new BlockCompressionHelper(baos, def);
 			helper.write(rawData);

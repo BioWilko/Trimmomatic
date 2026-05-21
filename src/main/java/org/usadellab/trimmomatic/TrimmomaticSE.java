@@ -95,8 +95,8 @@ public class TrimmomaticSE extends Trimmomatic {
 
 		if (verbose) {
 			for (Trimmer t : trimmers) {
-				if (t instanceof IlluminaClippingTrimmer)
-					((IlluminaClippingTrimmer) t).printStats(logger);
+				if (t instanceof IlluminaClippingTrimmer ict)
+					ict.printStats(logger);
 			}
 		}
 	}

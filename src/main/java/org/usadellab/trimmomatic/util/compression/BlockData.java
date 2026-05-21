@@ -1,5 +1,5 @@
 package org.usadellab.trimmomatic.util.compression;
 
-public interface BlockData {
-	public byte[] getData();
+public sealed interface BlockData permits GzipBlockData, Bzip2BlockData, UncompressedBlockData {
+	byte[] data();
 }

@@ -1,2 +1,5 @@
 /target/
 .vscode/settings.json
+.claudeignore
+CLAUDE.md
+.claude/

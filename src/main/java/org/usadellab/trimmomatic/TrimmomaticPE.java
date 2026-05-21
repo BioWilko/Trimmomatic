@@ -138,8 +138,8 @@ public class TrimmomaticPE extends Trimmomatic {
 
 		if (verbose) {
 			for (Trimmer t : trimmers) {
-				if (t instanceof IlluminaClippingTrimmer)
-					((IlluminaClippingTrimmer) t).printStats(logger);
+				if (t instanceof IlluminaClippingTrimmer ict)
+					ict.printStats(logger);
 			}
 		}
 	}
@@ -148,10 +148,21 @@ public class TrimmomaticPE extends Trimmomatic {
 			Trimmer trimmers[], int phredOffset, File trimLog, File statsSummary, boolean validatePairing,
 			Boolean compressBlock, Integer compressLevel, int threads, boolean verbose) throws Exception {
 		FastqParser parser1 = new FastqParser(phredOffset);
-		parser1.open(input1);
-
 		FastqParser parser2 = new FastqParser(phredOffset);
-		parser2.open(input2);
+
+		Exception[] openErrors = new Exception[2];
+		Thread t1 = Thread.ofVirtual().start(() -> {
+			try { parser1.open(input1); }
+			catch (Exception e) { openErrors[0] = e; }
+		});
+		Thread t2 = Thread.ofVirtual().start(() -> {
+			try { parser2.open(input2); }
+			catch (Exception e) { openErrors[1] = e; }
+		});
+		t1.join();
+		t2.join();
+		if (openErrors[0] != null) throw openErrors[0];
+		if (openErrors[1] != null) throw openErrors[1];
 
 		if (phredOffset == 0) {
 			int phred1 = parser1.determinePhredOffset();

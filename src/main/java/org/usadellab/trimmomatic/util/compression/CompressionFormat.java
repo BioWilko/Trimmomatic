@@ -42,50 +42,34 @@ public enum CompressionFormat {
 	public static InputStream wrapStreamForParsing(InputStream is, String name) throws IOException {
 		CompressionFormat cf = CompressionFormat.forName(name);
 
-		switch (cf) {
-		case GZIP:
-			return new ConcatGZIPInputStream(is);
-		case BZIP2:
-			return new BZip2CompressorInputStream(is, true);
-		case ZIP:
-			return new ZipInputStream(is);
-		default:
-			return is;
-		}
+		return switch (cf) {
+			case GZIP -> new ConcatGZIPInputStream(is);
+			case BZIP2 -> new BZip2CompressorInputStream(is, true);
+			case ZIP -> new ZipInputStream(is);
+			case NONE -> is;
+		};
 	}
 
 	public static OutputStream wrapStreamForSerializing(OutputStream os, String name, Integer compressLevel)
 			throws IOException {
 		CompressionFormat cf = CompressionFormat.forName(name);
 
-		switch (cf) {
-		case GZIP:
-			if (compressLevel == null)
-				return new GZIPOutputStream(os);
-			else
-				return new TunableGZIPOutputStream(os, compressLevel);
-		case BZIP2:
-			if (compressLevel == null)
-				return new BZip2CompressorOutputStream(os);
-			else
-				return new BZip2CompressorOutputStream(os, compressLevel);
-		default:
-			return os;
-		}
+		return switch (cf) {
+			case GZIP -> compressLevel == null ? new GZIPOutputStream(os) : new TunableGZIPOutputStream(os, compressLevel);
+			case BZIP2 -> compressLevel == null ? new BZip2CompressorOutputStream(os) : new BZip2CompressorOutputStream(os, compressLevel);
+			default -> os;
+		};
 	}
 
 	public static ParallelCompressor parallelCompressorForSerializing(Logger logger, String name,
 			Integer compressLevel) {
 		CompressionFormat cf = CompressionFormat.forName(name);
 
-		switch (cf) {
-		case GZIP:
-			return new GzipParallelCompressor(logger, compressLevel);
-		case BZIP2:
-			return new Bzip2ParallelCompressor(compressLevel);
-		default:
-			return null;
-		}
+		return switch (cf) {
+			case GZIP -> new GzipParallelCompressor(logger, compressLevel);
+			case BZIP2 -> new Bzip2ParallelCompressor(compressLevel);
+			default -> null;
+		};
 
 	}
 

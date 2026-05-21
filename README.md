@@ -85,7 +85,7 @@ To perform the same steps using a single-ended adapter file, run:
 java -jar Trimmomatic-0.41.jar SE \
 input.fq.gz \
 output.fq.gz \
-ILLUMINACLIP:TruSeq3-SE:2:30:10 \
+ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 \
 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
 ``` 
 # Description of Trimming Steps
@@ -169,7 +169,7 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticS
 * `-baseout <templateOutputFile>`: template path used to generate the four **paired-end** output files (using the `_1P`, `_1U`, `_2P`, `_2U` suffixes).
 * `-validatePairs`: performs an extra validation step on **paired-end** reads after trimming to ensure read pairs are consistent.
 * `-compressLevel <level>`: sets the compression level for BZIP2/GZ output files (1=fastest, 9=best compression).
-* `-compressStream` | `compressBlock`: specifies the compression mode. Block compression is the default.
+* `-compressStream` | `-compressBlock`: specifies the compression mode. Block compression is the default.
 * `-quiet`: suppresses progress output to the console.
 * `-verbose`: enables detailed reporting of adapter removal statistics when using the ILLUMINACLIP step.
 * `-version`: prints the Trimmomatic version number to the console.
@@ -181,7 +181,7 @@ Multiple steps can be specified as required, by using additional arguments at th
 Most steps take one or more settings, delimited by `:`.
 
 * `ILLUMINACLIP:<fastaWithAdaptersEtc>:<seed mismatches>:<palindrome clip threshold>:<simple clip threshold>:<minAdapterLengthPalindrome>:<keepBothReads>`
-    * `fastaWithAdaptersEtc`: specifies the path to a fasta file containing all the adapters, PCR sequences etc. The naming of the various sequences within this file determines how they are used. See below.
+    * `fastaWithAdaptersEtc`: specifies the path to a fasta file containing all the adapters, PCR sequences etc. The naming of the various sequences within this file determines how they are used. See below. If a bare filename (no path separator) is given, Trimmomatic searches for it in: (1) the `adapters/` directory next to the JAR, (2) the current working directory, and (3) an `adapters/` subdirectory of the current working directory.
     * `seedMismatches`: specifies the maximum mismatch count which will still allow a full match to be performed
     * `palindromeClipThreshold`: specifies how accurate the match between the two 'adapter ligated' reads must be for PE palindrome read alignment.
     * `simpleClipThreshold`: specifies how accurate the match between any adapter etc. sequence must be against a read.
