@@ -74,7 +74,7 @@ public class TailCropTrimmer implements Trimmer {
 	}
 
 	private FastqRecord processRecord(FastqRecord in, int bases, int maxLength) {
-		int len = in.getSequence().length();
+		int len = in.getLength();
 
 		int toTrim = bases;
 		int overLen = len - toTrim - maxLength;

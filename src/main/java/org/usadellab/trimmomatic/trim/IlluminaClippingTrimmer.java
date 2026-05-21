@@ -404,8 +404,8 @@ public class IlluminaClippingTrimmer implements Trimmer {
 
 			long ref1, ref2;
 
-			int seqlen1 = rec1.getSequence().length() + prefixLength;
-			int seqlen2 = rec2.getSequence().length() + prefixLength;
+			int seqlen1 = rec1.getLength() + prefixLength;
+			int seqlen2 = rec2.getLength() + prefixLength;
 
 			int maxCount = (seqlen1 > seqlen2 ? seqlen1 : seqlen2) - 15 - minPrefix;
 

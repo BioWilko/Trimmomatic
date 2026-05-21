@@ -39,9 +39,9 @@ public class FastqRecord {
 	public FastqRecord(FastqRecord base, int headPos, int length) {
 		if (headPos < 0)
 			throw new RuntimeException("Attempting invalid trim on " + base.name + " with length "
-					+ base.sequenceLength() + ": Wanted " + headPos + " to " + (headPos + length));
+					+ base.getLength() + ": Wanted " + headPos + " to " + (headPos + length));
 
-		int availableLength = base.sequenceLength();
+		int availableLength = base.getLength();
 		if (headPos + length > availableLength)
 			length = availableLength - headPos;
 
@@ -85,7 +85,7 @@ public class FastqRecord {
 		return make(name, sequence, 40);
 	}
 
-	private int sequenceLength() {
+	public int getLength() {
 		return (rawSequence != null) ? viewLength : sequence.length();
 	}
 
@@ -171,7 +171,7 @@ public class FastqRecord {
 	private static int RECORD_ADDED_LENGTH = 10;
 
 	public int getRecordLength() {
-		int seqLen = (rawSequence != null) ? viewLength : sequence.length();
+		int seqLen = getLength();
 		return this.name.length() + seqLen + this.comment.length() + seqLen + RECORD_ADDED_LENGTH;
 	}
 

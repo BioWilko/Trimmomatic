@@ -60,10 +60,10 @@ public class BlockOfWork implements Callable<BlockOfRecords> {
 		int trimTail = 0;
 
 		if (rec != null) {
-			length = rec.getSequence().length();
+			length = rec.getLength();
 			startPos = rec.getHeadPos();
 			endPos = length + startPos;
-			trimTail = originalRec.getSequence().length() - endPos;
+			trimTail = originalRec.getLength() - endPos;
 		}
 
 		return new TrimLogRecord(originalRec.getName(), length, startPos, endPos, trimTail);
