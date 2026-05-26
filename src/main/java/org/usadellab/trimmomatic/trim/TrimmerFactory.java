@@ -65,6 +65,21 @@ public class TrimmerFactory {
 		if (trimmerName.equals("TOPHRED64"))
 			return new ToPhred64Trimmer(args);
 
+		if (trimmerName.equals("MAXAMBIG"))
+			return new MaxAmbigTrimmer(args);
+
+		if (trimmerName.equals("POLYX"))
+			return new PolyXTrimmer(args);
+
+		if (trimmerName.equals("LOWCOMPLEXITY"))
+			return new LowComplexityTrimmer(args);
+
+		if (trimmerName.equals("UMIEXTRACT"))
+			return new UmiExtractTrimmer(args);
+
+		if (trimmerName.equals("LONGREADCLIP"))
+			return new LongReadClipTrimmer(args);
+
 		throw new RuntimeException("Unknown trimmer: " + trimmerName);
 	}
 }

@@ -62,6 +62,16 @@ public class FastqRecord {
 		this.barcodeLabel = base.barcodeLabel;
 	}
 
+	/**
+	 * View constructor with an explicit name override. Used by UmiExtractTrimmer
+	 * to append the extracted UMI to the read name without materialising the
+	 * sequence or quality substrings.
+	 */
+	public FastqRecord(FastqRecord base, int headPos, int length, String nameOverride) {
+		this(base, headPos, length);
+		this.name = nameOverride;
+	}
+
 	public FastqRecord(FastqRecord base, String sequence, String quality, int phredOffset) {
 		this.sequence = sequence;
 		this.quality = quality;

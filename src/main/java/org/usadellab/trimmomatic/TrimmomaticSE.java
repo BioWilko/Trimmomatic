@@ -134,6 +134,7 @@ public class TrimmomaticSE extends Trimmomatic {
 		boolean quiet = false;
 		boolean showVersion = false;
 		boolean verbose = false;
+		boolean longread = false;
 
 		Boolean compressBlock = null;
 		Integer compressLevel = null;
@@ -183,6 +184,8 @@ public class TrimmomaticSE extends Trimmomatic {
 					verbose = true;
 				else if (arg.equals("-version"))
 					showVersion = true;
+				else if (arg.equals("-longread"))
+					longread = true;
 				else {
 					System.err.println("Unknown option " + arg);
 					badOption = true;
@@ -209,6 +212,13 @@ public class TrimmomaticSE extends Trimmomatic {
 			logger.infoln("Automatically using " + threads + " threads");
 		}
 
+		// -longread skips the expensive 10k-record phred pre-read and defaults to
+		// Phred+33 (correct for all current long-read platforms: ONT, PacBio HiFi/CLR).
+		if (longread && phredOffset == 0) {
+			phredOffset = 33;
+			logger.infoln("Long-read mode: assuming Phred+33 quality encoding");
+		}
+
 		Iterator<String> nonOptionArgsIter = nonOptionArgs.iterator();
 
 		File input = new File(nonOptionArgsIter.next());
@@ -226,7 +236,7 @@ public class TrimmomaticSE extends Trimmomatic {
 	public static void main(String[] args) throws Exception {
 		if (!run(args)) {
 			System.err.println(
-					"Usage: TrimmomaticSE [-version] [-threads <threads>] [-phred33|-phred64] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-verbose] [-compressLevel <lvl>] [-compressStream|-compressBlock] <inputFile> <outputFile> <trimmer1>...");
+					"Usage: TrimmomaticSE [-version] [-threads <threads>] [-phred33|-phred64] [-longread] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-verbose] [-compressLevel <lvl>] [-compressStream|-compressBlock] <inputFile> <outputFile> <trimmer1>...");
 			System.exit(1);
 		}
 	}

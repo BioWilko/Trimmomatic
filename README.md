@@ -38,11 +38,11 @@ mvn clean package
 For standard cleaning of Illumina data, you can now invoke Trimmomatic with just the input files. Output files will be created in the same folder as the input files and named automatically (appending `.trimmed.fq.gz` for single read files or `.trimmed.paired.fq.gz` & `.trimmed.unpaired.fq.gz` for paired end read files), and standard trimming steps will be applied (`ILLUMINACLIP:TruSeq3-SE.fa` or `TruSeq3-PE-2-GGGGG.fa` `:2:30:10 SLIDINGWINDOW:4:20 MINLEN:36`). This mode also automatically detects and uses all available processor threads.
 
 ```
-java -jar Trimmomatic-0.41.jar input.fq.gz
+java -jar Trimmomatic-0.42.jar input.fq.gz
 ```
 or
 ```
-java -jar Trimmomatic-0.41.jar input_R1.fq.gz input_R2.fq.gz
+java -jar Trimmomatic-0.42.jar input_R1.fq.gz input_R2.fq.gz
 ```
 
 ## Paired End:
@@ -54,7 +54,7 @@ You often don't need leading and traling clipping. Also in general setting the `
 If you have questions please don't hesitate to contact us, this is not necessarily one size fits all. (e.g. RNAseq expression analysis vs DNA assembly).
 
 ```
-java -jar Trimmomatic-0.41.jar PE \
+java -jar Trimmomatic-0.42.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -64,7 +64,7 @@ ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36
 for reference only (less sensitive for adapters)
 
 ```
-java -jar Trimmomatic-0.41.jar PE \
+java -jar Trimmomatic-0.42.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -82,7 +82,7 @@ This will perform the following:
 ## Single End:
 To perform the same steps using a single-ended adapter file, run:
 ```
-java -jar Trimmomatic-0.41.jar SE \
+java -jar Trimmomatic-0.42.jar SE \
 input.fq.gz \
 output.fq.gz \
 ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 \
@@ -106,6 +106,11 @@ The current trimming steps are:
 * `MAXLEN`: Drop the read if it is longer than a specified length.
 * `AVGQUAL`: Drop the read if its average quality is below a specified threshold.
 * `BASECOUNT`: Drop the read if the count of a specified base (or bases) is outside a given minimum and maximum.
+* `POLYX`: Trim a homopolymer run from the 3' end; drop the read if it consists entirely of that base.
+* `LOWCOMPLEXITY`: Drop the read if its Shannon entropy (over A/C/G/T frequencies, N excluded) is below a minimum.
+* `UMIEXTRACT`: Extract a UMI from the 5' end and append it to the read name.
+* `MAXAMBIG`: Drop the read if the fraction of N bases exceeds a maximum.
+* `LONGREADCLIP`: Trim 3' adapter sequences from long reads using Hamming distance (no indels). Adapters loaded from a FASTA file; both orientations are checked automatically.
 * `TOPHRED33`: Convert quality scores to Phred-33.
 * `TOPHRED64`: Convert quality scores to Phred-64.
 
@@ -119,14 +124,16 @@ Since version 0.27, trimmomatic can be executed using -jar. The 'old' method, us
 ## Paired End Mode:
 
 ```
-java -jar <path to trimmomatic.jar> PE [-threads <threads>] [-phred33 | -phred64] \
+java -jar <path to trimmomatic.jar> PE [-threads <threads>] [-phred33 | -phred64] [-longread] \
 [-trimlog <logFile>] [-summary <summaryFile>] [-basein <templateInputFile>] [-baseout <templateOutputFile>] \
-[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
-<input 1> <input 2> \
+[-validatePairs] [-interleaved] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
+<input 1> [<input 2>] \
 <paired output 1> <unpaired output 1> \
 <paired output 2> <unpaired output 2> \
 <step 1> # Additional steps added as needed
 ```
+
+> **Interleaved input**: With `-interleaved`, supply a single FASTQ file in which R1 and R2 records alternate. Trimmomatic will automatically split the stream into separate R1 and R2 processing paths. `-validatePairs` is ignored in interleaved mode.
 
 or
 
@@ -142,7 +149,7 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticP
 ## Single End Mode:
 
 ```
-java -jar <path to trimmomatic jar> SE [-threads <threads>] [-phred33 | -phred64] \
+java -jar <path to trimmomatic jar> SE [-threads <threads>] [-phred33 | -phred64] [-longread] \
 [-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input> <output> \
 <step 1> # Additional steps added as needed
@@ -168,11 +175,13 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticS
 * `-basein <templateInputFile>`: path to one of the **paired-end** input files; its mate is auto-detected.
 * `-baseout <templateOutputFile>`: template path used to generate the four **paired-end** output files (using the `_1P`, `_1U`, `_2P`, `_2U` suffixes).
 * `-validatePairs`: performs an extra validation step on **paired-end** reads after trimming to ensure read pairs are consistent.
+* `-interleaved`: (**PE only**) accept a single interleaved FASTQ file where R1 and R2 records alternate. Only one input file is supplied on the command line. `-validatePairs` is ignored in this mode.
+* `-longread`: skip the Phred-encoding pre-read (which reads up to 10 000 records to auto-detect quality encoding) and assume **Phred+33** — correct for all current long-read platforms (ONT, PacBio HiFi, PacBio CLR). Avoids loading hundreds of megabytes of data before trimming begins when the encoding is already known.
 * `-compressLevel <level>`: sets the compression level for BZIP2/GZ output files (1=fastest, 9=best compression).
 * `-compressStream` | `-compressBlock`: specifies the compression mode. Block compression is the default.
 * `-quiet`: suppresses progress output to the console.
 * `-verbose`: enables detailed reporting of adapter removal statistics when using the ILLUMINACLIP step.
-* `-version`: prints the Trimmomatic version number to the console.
+* `-version`: prints the Trimmomatic version and build identity to the console. The output includes the 7-character git commit hash of the source used to build the JAR, and a `-dirty` suffix if the working tree had uncommitted changes at build time (e.g. `0.42+a3f8b21` for a clean build, `0.42+a3f8b21-dirty` for a local test build). The JAR filename itself only contains the release version number and is never affected by the git state.
 
 ## Step options:
 
@@ -225,6 +234,47 @@ Most steps take one or more settings, delimited by `:`.
     * `minCount`: (optional) the minimum number of times the `bases` must appear for the read to be kept.
     * `maxCount`: (optional) the maximum number of times the `bases` are allowed to appear.
     
+* `POLYX:<base>:<minLength>`
+    * `base`: the nucleotide to look for at the 3' end (A, C, G, T, or N).
+    * `minLength`: the minimum run length required to trigger trimming. If the entire read is poly-X, it is dropped.
+    * Example: `POLYX:A:10` trims polyA tails of ≥10 bases; `POLYX:G:10` removes polyG artefacts from two-colour Illumina chemistry.
+
+* `LOWCOMPLEXITY:<minEntropy>`
+    * `minEntropy`: the minimum acceptable Shannon entropy calculated over A/C/G/T base frequencies (N bases are excluded). Entropy ranges from 0.0 (single-base homopolymer) to 2.0 (perfectly uniform ACGT). Reads with entropy **strictly below** the threshold are dropped.
+    * Recommended values: `1.5` to aggressively drop di-nucleotide repeats (e.g. ATAT…); `1.0` to retain them while still dropping homopolymers; `0.5` for a very lenient filter.
+    * Example: `LOWCOMPLEXITY:1.0`
+
+* `UMIEXTRACT:<length>[:<separator>]`
+    * `length`: the number of bases to extract from the 5' end as the UMI.
+    * `separator`: (optional) the string used to separate the original read name and the UMI tag [default = `_`].
+    * The extracted UMI is appended to the read name as `<separator>UMI:<bases>` and removed from the sequence. For paired-end single-cell protocols (10x Genomics, Drop-seq), apply only to R1.
+    * Example: `UMIEXTRACT:12` → name becomes `@readname_UMI:ACGTACGTACGT`; `UMIEXTRACT:10:__` uses `__` as separator.
+
+* `MAXAMBIG:<maxFraction>`
+    * `maxFraction`: the maximum allowed fraction of N bases in the read (0.0–1.0). Reads exceeding this fraction are dropped.
+    * Example: `MAXAMBIG:0.1` drops any read with more than 10 % N bases.
+
+* `LONGREADCLIP:<fasta>:<maxErrorRate>[:<minOverlap>]`
+    * `fasta`: path to a FASTA file containing adapter sequences. Both forward and reverse-complement orientations are loaded automatically.
+    * `maxErrorRate`: the maximum fraction of mismatches allowed in a matching overlap (e.g. `0.10` allows 1 mismatch per 10 bp). N bases in either the read or the adapter are treated as wildcards and are never counted as mismatches.
+    * `minOverlap`: (optional) the minimum number of overlapping bases required to call an adapter match [default = 10].
+    * The trimmer scans the 3' end of each read for adapter overlap; the longest valid overlap wins. Reads trimmed to zero length are dropped.
+    * Example: `LONGREADCLIP:adapters/ONT-LSK114.fa:0.10:10` — ONT R10.4.1 / Kit 14 reads.
+    * Example: `LONGREADCLIP:adapters/PacBio-Sequel.fa:0.15` — PacBio Sequel / SequelII / Revio reads with relaxed error rate.
+    * Trimmomatic ships adapter files for the most common long-read platforms in the `adapters/` directory:
+
+| File | Platform / Chemistry |
+|------|----------------------|
+| `adapters/ONT-LSK108-LSK110.fa` | Oxford Nanopore SQK-LSK108, LSK109, LSK110 (R9.4 / R9.4.1) |
+| `adapters/ONT-LSK112.fa` | Oxford Nanopore SQK-LSK112 (R10.3) |
+| `adapters/ONT-LSK114.fa` | Oxford Nanopore SQK-LSK114, LSK114-24 (R10.4.1 / Kit 14) |
+| `adapters/ONT-Rapid.fa` | Oxford Nanopore RAD004, RAD114, RBK004, RBK114 (Rapid kits) |
+| `adapters/ONT-cDNA.fa` | Oxford Nanopore SQK-PCS109, PCS114 (direct cDNA / PCR-cDNA) |
+| `adapters/PacBio-RSII.fa` | PacBio RS II — SMRTbell adapter (NGB00972.1) + C2 sequencing primer |
+| `adapters/PacBio-Sequel.fa` | PacBio Sequel, SequelII, SequelIIe, Revio, ETK2.0 — SMRTbell adapter + C2 primer |
+
+    * **Note:** Adapter chemistry evolves with each new kit generation. For kits not listed above, consult your platform's official documentation or community-curated sources such as [Porechop](https://github.com/rrwick/Porechop/blob/master/porechop/adapters.py) (ONT) and the [PacBio SMRTbell adapter documentation](https://www.pacb.com/documentation/).
+
 * `TOPHRED33`
 
 * `TOPHRED64`

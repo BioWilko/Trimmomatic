@@ -14,7 +14,8 @@ import org.usadellab.trimmomatic.util.compression.CompressionFormat;
 
 public class FastqParser {
 
-	private static final int PREREAD_COUNT = 10000;
+	private static final int  PREREAD_COUNT     = 10000;
+	private static final long PREREAD_MAX_BYTES = 4L * 1024 * 1024; // 4 MB byte cap for phred detection
 
 	private int phredOffset;
 	private ArrayDeque<FastqRecord> deque;
@@ -126,12 +127,18 @@ public class FastqParser {
 		if (phredOffset == 0) {
 			deque.clear();
 			qualHistogram = new int[256];
+			long prereadsBytes = 0;
 
 			for (int i = 0; i < PREREAD_COUNT; i++) {
 				parseOne();
-				if (current != null) {
-					deque.add(current);
-					accumulateHistogram(current);
+				if (current == null) {
+					break; // EOF — stop preread early
+				}
+				deque.add(current);
+				accumulateHistogram(current);
+				prereadsBytes += current.getRecordLength();
+				if (prereadsBytes >= PREREAD_MAX_BYTES) {
+					break; // byte budget exhausted — enough data for phred detection
 				}
 			}
 		}

@@ -167,6 +167,38 @@ public class TrimmerFactoryTest {
 	}
 
 	@Test
+	public void testMakeMaxAmbigTrimmer() throws IOException {
+		TrimmerFactory factory = new TrimmerFactory(mock(Logger.class));
+		Trimmer trimmer = factory.makeTrimmer("MAXAMBIG:0.2");
+		assertNotNull(trimmer);
+		assertInstanceOf(MaxAmbigTrimmer.class, trimmer);
+	}
+
+	@Test
+	public void testMakePolyXTrimmer() throws IOException {
+		TrimmerFactory factory = new TrimmerFactory(mock(Logger.class));
+		Trimmer trimmer = factory.makeTrimmer("POLYX:A:10");
+		assertNotNull(trimmer);
+		assertInstanceOf(PolyXTrimmer.class, trimmer);
+	}
+
+	@Test
+	public void testMakeLowComplexityTrimmer() throws IOException {
+		TrimmerFactory factory = new TrimmerFactory(mock(Logger.class));
+		Trimmer trimmer = factory.makeTrimmer("LOWCOMPLEXITY:1.0");
+		assertNotNull(trimmer);
+		assertInstanceOf(LowComplexityTrimmer.class, trimmer);
+	}
+
+	@Test
+	public void testMakeUmiExtractTrimmer() throws IOException {
+		TrimmerFactory factory = new TrimmerFactory(mock(Logger.class));
+		Trimmer trimmer = factory.makeTrimmer("UMIEXTRACT:12");
+		assertNotNull(trimmer);
+		assertInstanceOf(UmiExtractTrimmer.class, trimmer);
+	}
+
+	@Test
 	public void testUnknownTrimmer() {
 		TrimmerFactory factory = new TrimmerFactory(mock(Logger.class));
 		assertThrows(RuntimeException.class, () -> factory.makeTrimmer("UNKNOWN:123"));

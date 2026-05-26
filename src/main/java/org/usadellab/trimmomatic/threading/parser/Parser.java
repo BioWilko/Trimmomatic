@@ -10,7 +10,8 @@ import org.usadellab.trimmomatic.fastq.FastqRecord;
 import org.usadellab.trimmomatic.threading.ExceptionHolder;
 
 public abstract class Parser {
-	public static final int BLOCK_MAX_RECORDS = 32768; // 32k records per block
+	public static final int  BLOCK_MAX_RECORDS = 32768;             // 32k records per block
+	public static final long BLOCK_MAX_BYTES   = 64L * 1024 * 1024; // 64 MB per block (long-read safety)
 
 	public static Parser makeParser(boolean useWorker, int buffers, FastqParser rawParser,
 			ExceptionHolder exceptionHolder) {
@@ -41,14 +42,19 @@ public abstract class Parser {
 	}
 
 	protected List<FastqRecord> parseBlock() throws IOException {
-		List<FastqRecord> recs = new ArrayList<FastqRecord>(BLOCK_MAX_RECORDS);
+		// Initial capacity is capped at 1024 to avoid over-allocating for long-read
+		// files where a single block may contain very few but very large records.
+		List<FastqRecord> recs = new ArrayList<>(Math.min(BLOCK_MAX_RECORDS, 1024));
+		long blockBytes = 0;
 
 		while (parser.hasNext()) {
 			FastqRecord rec = parser.next();
 			recs.add(rec);
+			blockBytes += rec.getRecordLength();
 
-			if (recs.size() >= BLOCK_MAX_RECORDS)
+			if (recs.size() >= BLOCK_MAX_RECORDS || blockBytes >= BLOCK_MAX_BYTES) {
 				return recs;
+			}
 		}
 
 		return recs;
