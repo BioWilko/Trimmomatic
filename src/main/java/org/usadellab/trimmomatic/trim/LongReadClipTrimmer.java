@@ -45,7 +45,13 @@ public class LongReadClipTrimmer extends AbstractSingleRecordTrimmer {
 
     private static final int DEFAULT_MIN_OVERLAP = 10;
 
+    /** All adapter sequences: forward orientations plus their reverse complements.
+     *  Used for 3' end detection, where read-through can expose either orientation. */
     private final List<String> adapters;
+    /** Only the forward-orientation sequences loaded directly from the FASTA.
+     *  Used for 5' end detection: a 5' residual is the suffix of the original adapter,
+     *  never the suffix of its reverse complement. */
+    private final List<String> forwardAdapters;
     private final float        maxErrorRate;
     private final int          minOverlap;
 
@@ -96,7 +102,8 @@ public class LongReadClipTrimmer extends AbstractSingleRecordTrimmer {
         maxErrorRate   = tempErrorRate;
         minOverlap     = tempMinOverlap;
 
-        adapters = new ArrayList<>();
+        adapters        = new ArrayList<>();
+        forwardAdapters = new ArrayList<>();
         loadAdapters(fastaFile);
 
         if (adapters.isEmpty()) {
@@ -128,6 +135,7 @@ public class LongReadClipTrimmer extends AbstractSingleRecordTrimmer {
 
     private void addAdapter(String seq) {
         String upper = seq.toUpperCase();
+        forwardAdapters.add(upper);
         adapters.add(upper);
         String rc = reverseComplement(upper);
         if (!rc.equals(upper)) {
@@ -171,21 +179,16 @@ public class LongReadClipTrimmer extends AbstractSingleRecordTrimmer {
 		int    trimPos  = readLen; // 3' sentinel: keep everything up to here
 		int    clipFrom = 0;      // 5' sentinel: keep everything from here
 
+		// --- 3' end: check all adapters (forward + RC) ---
+		// A 3' residual can appear in either orientation (e.g. read-through on short inserts).
 		for (String adapter : adapters) {
 			int adapterLen = adapter.length();
 			int maxOverlap = Math.min(readLen, adapterLen);
+			if (maxOverlap < minOverlap) continue;
 
-			if (maxOverlap < minOverlap) {
-				continue;
-			}
-
-			// --- 3' end: adapter PREFIX matches read SUFFIX ---
-			// Scan longest-overlap first; first hit is the most confident.
 			for (int overlap = maxOverlap; overlap >= minOverlap; overlap--) {
 				int readStart = readLen - overlap;
-				if (readStart >= trimPos) {
-					break; // a shorter overlap cannot improve on an existing hit
-				}
+				if (readStart >= trimPos) break;
 
 				int allowedMismatches = (int) (overlap * maxErrorRate);
 				int mismatches        = 0;
@@ -195,26 +198,26 @@ public class LongReadClipTrimmer extends AbstractSingleRecordTrimmer {
 					char rc = seq.charAt(readStart + i);
 					char ac = adapter.charAt(i);
 					if (rc != ac && ac != 'N' && rc != 'N') {
-						if (++mismatches > allowedMismatches) {
-							exceeded = true;
-							break;
-						}
+						if (++mismatches > allowedMismatches) { exceeded = true; break; }
 					}
 				}
-				if (!exceeded) {
-					trimPos = readStart;
-					break;
-				}
+				if (!exceeded) { trimPos = readStart; break; }
 			}
+		}
 
-			// --- 5' end: adapter SUFFIX matches read PREFIX ---
-			// Scan longest-overlap first; take the deepest (rightmost) clip.
+		// --- 5' end: check forward-orientation adapters only ---
+		// A 5' residual is the suffix of the original adapter as loaded from the FASTA.
+		// Checking reverse-complement orientations here would cause false positives
+		// (the RC of adapter X has a different suffix and no biological meaning at the 5' end).
+		for (String adapter : forwardAdapters) {
+			int adapterLen = adapter.length();
+			int maxOverlap = Math.min(readLen, adapterLen);
+			if (maxOverlap < minOverlap) continue;
+
 			for (int overlap = maxOverlap; overlap >= minOverlap; overlap--) {
-				if (overlap <= clipFrom) {
-					break; // a shorter overlap cannot improve on an existing clip
-				}
+				if (overlap <= clipFrom) break;
 
-				int adapterStart     = adapterLen - overlap;
+				int adapterStart      = adapterLen - overlap;
 				int allowedMismatches = (int) (overlap * maxErrorRate);
 				int mismatches        = 0;
 				boolean exceeded      = false;
@@ -223,16 +226,10 @@ public class LongReadClipTrimmer extends AbstractSingleRecordTrimmer {
 					char rc = seq.charAt(i);
 					char ac = adapter.charAt(adapterStart + i);
 					if (rc != ac && ac != 'N' && rc != 'N') {
-						if (++mismatches > allowedMismatches) {
-							exceeded = true;
-							break;
-						}
+						if (++mismatches > allowedMismatches) { exceeded = true; break; }
 					}
 				}
-				if (!exceeded) {
-					clipFrom = overlap;
-					break;
-				}
+				if (!exceeded) { clipFrom = overlap; break; }
 			}
 		}
 

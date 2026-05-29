@@ -229,13 +229,14 @@ public class LongReadClipTrimmerTest {
 
     @Test
     public void testNInAdapter_isWildcard() throws Exception {
-        // Adapter NNNNNNNN (all N). Matches anything.
+        // Adapter NNNNNNNN (all N): N bases act as wildcards and match any base.
+        // With both-end clipping the first and last 8 bases are consumed; the middle 8 survive.
         File fasta = singleAdapterFasta("NNNNNNNN");
         LongReadClipTrimmer t = trimmer(fasta, 0.0f, 8);
-        FastqRecord rec = makeRecord("ACGTACGTACGTACGT");
+        FastqRecord rec = makeRecord("ACGTACGTTTTTTTTTACGTACGT"); // 24 bases
         FastqRecord result = t.processRecord(rec);
         assertNotNull(result);
-        assertEquals("ACGTACGT", result.getSequence());
+        assertEquals("TTTTTTTT", result.getSequence()); // middle 8 bases survive
     }
 
     // ------------------------------------------------------------------
