@@ -118,7 +118,7 @@ public class Trimmomatic {
 				seArgs.add(String.valueOf(Runtime.getRuntime().availableProcessors()));
 				seArgs.add(inputPath);
 				seArgs.add(output);
-				seArgs.add("ILLUMINACLIP:TruSeq3-SE.fa:2:30:10");
+				seArgs.add("ILLUMINACLIP:TruSeq3-SE-GGGGG.fa:2:30:10");
 				seArgs.add("SLIDINGWINDOW:4:20");
 				seArgs.add("MINLEN:36");
 
