@@ -12,7 +12,7 @@ import org.usadellab.trimmomatic.fastq.FastqRecord;
 /**
  * Long-read adapter clipping using Hamming distance (V0.42, no indels).
  *
- * Scans the 3' end of each read for every loaded adapter sequence. For each
+ * Scans both the 5' and 3' ends of each read for every loaded adapter sequence. For each
  * adapter, overlap lengths from {@code minOverlap} up to
  * {@code min(readLen, adapterLen)} are tested, scanning longest-first so the
  * most-confident (longest) hit takes precedence. At most
@@ -23,7 +23,7 @@ import org.usadellab.trimmomatic.fastq.FastqRecord;
  * Adapters are loaded from a FASTA file; both the forward orientation and its
  * reverse complement are added automatically (duplicates are skipped).
  *
- * Step syntax:
+ * Step syntax (trims both 5' and 3' ends):
  * <pre>
  *   LONGREADCLIP:&lt;fasta&gt;:&lt;maxErrorRate&gt;[:&lt;minOverlap&gt;]
  * </pre>
@@ -160,62 +160,89 @@ public class LongReadClipTrimmer extends AbstractSingleRecordTrimmer {
     // ------------------------------------------------------------------
     // Trimming logic
 
-    @Override
-    public FastqRecord processRecord(FastqRecord in) {
-        int readLen = in.getLength();
-        if (readLen == 0) {
-            return null;
-        }
+	@Override
+	public FastqRecord processRecord(FastqRecord in) {
+		int readLen = in.getLength();
+		if (readLen == 0) {
+			return null;
+		}
 
-        String seq     = in.getSequence();
-        int    trimPos = readLen; // sentinel: no trim found yet
+		String seq      = in.getSequence();
+		int    trimPos  = readLen; // 3' sentinel: keep everything up to here
+		int    clipFrom = 0;      // 5' sentinel: keep everything from here
 
-        for (String adapter : adapters) {
-            int adapterLen = adapter.length();
-            int maxOverlap = Math.min(readLen, adapterLen);
+		for (String adapter : adapters) {
+			int adapterLen = adapter.length();
+			int maxOverlap = Math.min(readLen, adapterLen);
 
-            if (maxOverlap < minOverlap) {
-                continue;
-            }
+			if (maxOverlap < minOverlap) {
+				continue;
+			}
 
-            // Scan from longest overlap downward so the first hit is the most confident.
-            for (int overlap = maxOverlap; overlap >= minOverlap; overlap--) {
-                int readStart = readLen - overlap;
-                if (readStart >= trimPos) {
-                    // Any hit here would be to the right of an already-found trim point.
-                    break;
-                }
+			// --- 3' end: adapter PREFIX matches read SUFFIX ---
+			// Scan longest-overlap first; first hit is the most confident.
+			for (int overlap = maxOverlap; overlap >= minOverlap; overlap--) {
+				int readStart = readLen - overlap;
+				if (readStart >= trimPos) {
+					break; // a shorter overlap cannot improve on an existing hit
+				}
 
-                int allowedMismatches = (int) (overlap * maxErrorRate);
-                int mismatches        = 0;
-                boolean exceeded      = false;
+				int allowedMismatches = (int) (overlap * maxErrorRate);
+				int mismatches        = 0;
+				boolean exceeded      = false;
 
-                for (int i = 0; i < overlap; i++) {
-                    char rc = seq.charAt(readStart + i);
-                    char ac = adapter.charAt(i);
-                    // N in either strand is a wildcard — not counted as a mismatch.
-                    if (rc != ac && ac != 'N' && rc != 'N') {
-                        mismatches++;
-                        if (mismatches > allowedMismatches) {
-                            exceeded = true;
-                            break;
-                        }
-                    }
-                }
+				for (int i = 0; i < overlap; i++) {
+					char rc = seq.charAt(readStart + i);
+					char ac = adapter.charAt(i);
+					if (rc != ac && ac != 'N' && rc != 'N') {
+						if (++mismatches > allowedMismatches) {
+							exceeded = true;
+							break;
+						}
+					}
+				}
+				if (!exceeded) {
+					trimPos = readStart;
+					break;
+				}
+			}
 
-                if (!exceeded) {
-                    trimPos = readStart; // update leftmost trim point for this adapter
-                    break;              // take longest (most confident) match per adapter
-                }
-            }
-        }
+			// --- 5' end: adapter SUFFIX matches read PREFIX ---
+			// Scan longest-overlap first; take the deepest (rightmost) clip.
+			for (int overlap = maxOverlap; overlap >= minOverlap; overlap--) {
+				if (overlap <= clipFrom) {
+					break; // a shorter overlap cannot improve on an existing clip
+				}
 
-        if (trimPos == 0) {
-            return null; // adapter found at position 0 — drop entire read
-        }
-        if (trimPos == readLen) {
-            return in;   // no adapter detected
-        }
-        return new FastqRecord(in, 0, trimPos);
-    }
+				int adapterStart     = adapterLen - overlap;
+				int allowedMismatches = (int) (overlap * maxErrorRate);
+				int mismatches        = 0;
+				boolean exceeded      = false;
+
+				for (int i = 0; i < overlap; i++) {
+					char rc = seq.charAt(i);
+					char ac = adapter.charAt(adapterStart + i);
+					if (rc != ac && ac != 'N' && rc != 'N') {
+						if (++mismatches > allowedMismatches) {
+							exceeded = true;
+							break;
+						}
+					}
+				}
+				if (!exceeded) {
+					clipFrom = overlap;
+					break;
+				}
+			}
+		}
+
+		int remainingLen = trimPos - clipFrom;
+		if (remainingLen <= 0) {
+			return null; // adapter covers the whole read
+		}
+		if (clipFrom == 0 && trimPos == readLen) {
+			return in;   // no adapter found at either end
+		}
+		return new FastqRecord(in, clipFrom, remainingLen);
+	}
 }

@@ -206,7 +206,8 @@ The current trimming steps are:
 * `LOWCOMPLEXITY`: Drop the read if its Shannon entropy (over A/C/G/T frequencies, N excluded) is below a minimum.
 * `UMIEXTRACT`: Extract a UMI from the 5' end and append it to the read name.
 * `MAXAMBIG`: Drop the read if the fraction of N bases exceeds a maximum.
-* `LONGREADCLIP`: Trim 3' adapter sequences from long reads using Hamming distance (no indels). Adapters loaded from a FASTA file; both orientations are checked automatically.
+* `LONGREADCLIP`: Trim adapter residuals from both the 5' and 3' ends of long reads using Hamming distance (no indels). Adapters loaded from a FASTA file; both orientations are checked automatically. **Single-end mode only.**
+* `LONGREADSPLIT`: Detect chimeric long reads by scanning the read interior for internal adapter sequences using k-mer seeding and Hamming distance. Splits chimeric reads into independent fragments, each of which then passes through subsequent steps. **Single-end mode only.**
 * `TOPHRED33`: Convert quality scores to Phred-33.
 * `TOPHRED64`: Convert quality scores to Phred-64.
 
@@ -285,7 +286,7 @@ Most steps take one or more settings, delimited by `:`.
     * `fasta`: path to a FASTA file containing adapter sequences. Both forward and reverse-complement orientations are loaded automatically.
     * `maxErrorRate`: the maximum fraction of mismatches allowed in a matching overlap (e.g. `0.10` allows 1 mismatch per 10 bp). N bases in either the read or the adapter are treated as wildcards and are never counted as mismatches.
     * `minOverlap`: (optional) the minimum number of overlapping bases required to call an adapter match [default = 10].
-    * The trimmer scans the 3' end of each read for adapter overlap; the longest valid overlap wins. Reads trimmed to zero length are dropped.
+    * Trims adapter residuals from **both the 5' and 3' ends**. At the 3' end the adapter prefix is matched against the read suffix; at the 5' end the adapter suffix is matched against the read prefix. The longest valid overlap wins at each end. Reads reduced to zero length are dropped. **Single-end mode only.**
     * Example: `LONGREADCLIP:adapters/ONT-LSK114.fa:0.10:10` — ONT R10.4.1 / Kit 14 reads.
     * Example: `LONGREADCLIP:adapters/PacBio-Sequel.fa:0.15` — PacBio Sequel / SequelII / Revio reads with relaxed error rate.
     * Trimmomatic ships adapter files for the most common long-read platforms in the `adapters/` directory:
@@ -301,6 +302,18 @@ Most steps take one or more settings, delimited by `:`.
 | `adapters/PacBio-Sequel.fa` | PacBio Sequel, SequelII, SequelIIe, Revio, ETK2.0 — SMRTbell adapter + C2 primer |
 
     * **Note:** Adapter chemistry evolves with each new kit generation. For kits not listed above, consult your platform's official documentation or community-curated sources such as [Porechop](https://github.com/rrwick/Porechop/blob/master/porechop/adapters.py) (ONT) and the [PacBio SMRTbell adapter documentation](https://www.pacb.com/documentation/).
+
+* `LONGREADSPLIT:<fasta>:<maxErrorRate>[:<minOverlap>[:<minFragmentLength>]]`
+    * `fasta`: path to a FASTA file containing adapter sequences (same file as used for `LONGREADCLIP`). Both forward and reverse-complement orientations are loaded automatically.
+    * `maxErrorRate`: the maximum fraction of mismatches allowed in a confirmed internal adapter match. Use the same value as for `LONGREADCLIP`.
+    * `minOverlap`: (optional) the minimum number of adapter bases that must match to call a chimera [default = 10]. Also defines the **terminal zone**: matches whose start position falls within this many bases of either end are ignored — those are handled by `LONGREADCLIP`.
+    * `minFragmentLength`: (optional) fragments shorter than this after splitting are discarded rather than emitted [default = 100].
+    * Internal adapter hits are found using **k-mer seeding** (8-mer index) followed by Hamming-distance verification, making the scan efficient even for very long reads. All hits in a single read are detected in one pass; reads with more than one internal adapter produce three or more fragments.
+    * Split fragments are renamed by appending `/splitNofM` to the original read name (e.g. `@read1/split1of2`, `@read1/split2of2`). Each fragment passes independently through all subsequent trimming steps.
+    * **Single-end mode only.** Raises an error if invoked in paired-end mode, as no current long-read platform (ONT, PacBio) produces paired-end data.
+    * Recommended pipeline order: `LONGREADSPLIT` → `LONGREADCLIP` → `MINLEN`
+    * Example: `LONGREADSPLIT:adapters/ONT-LSK114.fa:0.10` — detect and split ONT chimeras with default overlap and fragment-length thresholds.
+    * Example: `LONGREADSPLIT:adapters/ONT-LSK114.fa:0.10:10:200` — require ≥10 bp adapter overlap and discard fragments shorter than 200 bp.
 
 * `TOPHRED33`
 

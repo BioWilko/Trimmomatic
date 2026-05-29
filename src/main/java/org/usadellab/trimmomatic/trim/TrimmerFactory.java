@@ -80,6 +80,9 @@ public class TrimmerFactory {
 		if (trimmerName.equals("LONGREADCLIP"))
 			return new LongReadClipTrimmer(args);
 
+		if (trimmerName.equals("LONGREADSPLIT"))
+			return new LongReadSplitTrimmer(args);
+
 		throw new RuntimeException("Unknown trimmer: " + trimmerName);
 	}
 }

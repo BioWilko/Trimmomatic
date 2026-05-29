@@ -186,14 +186,17 @@ public class BlockOfWork implements Callable<BlockOfRecords> {
 				}
 			}
 
-			if (recs[0] != null)
-				trimmedRecs.add(recs[0]);
+			for (FastqRecord rec : recs) {
+				if (rec != null)
+					trimmedRecs.add(rec);
+			}
 
 			stats.logPair(originalRecs, recs);
 
-			if (trimLog) {
-				if (originalRecs[0] != null)
-					trimLogList.add(makeTrimLogRec(recs[0], originalRecs[0]));
+			if (trimLog && originalRecs[0] != null) {
+				for (FastqRecord rec : recs) {
+					trimLogList.add(makeTrimLogRec(rec, originalRecs[0]));
+				}
 			}
 		}
 
