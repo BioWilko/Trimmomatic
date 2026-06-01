@@ -176,7 +176,15 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticS
 * `-compressStream` | `-compressBlock`: specifies the compression mode. Block compression is the default.
 * `-quiet`: suppresses progress output to the console.
 * `-verbose`: enables detailed reporting of adapter removal statistics when using the ILLUMINACLIP step.
-* `-version`: prints the Trimmomatic version number to the console.
+* `-version`: prints the Trimmomatic version number to the console. When built from a git working tree the output includes the abbreviated commit hash and a `-dirty` suffix if uncommitted changes are present (e.g. `0.42+b49a43e`).
+* `-interleaved` *(PE only)*: treat the single input file as an interleaved FASTQ containing alternating R1 / R2 records. Only one input file is required; the four standard output files are still produced.
+* `-longread` *(SE and PE)*: skip the 10 000-record phred quality-encoding pre-read and assume Phred+33. Recommended for all ONT and PacBio inputs where the pre-read would otherwise read up to 4 MB of data unnecessarily.
+* `-technicalread <1|2>` *(PE only)*: designate one read as the **technical read** (cell barcode / UMI) that must pass through completely untouched. All trimming steps run only on the other (**biological**) read. If the biological read is dropped, both reads are discarded — the technical read **never** appears in the unpaired output file. Use `1` when R1 carries the barcode/UMI (e.g. 10x Genomics, Drop-seq), or `2` when the roles are swapped. Example:
+  ```
+  TrimmomaticPE -technicalread 1 R1.fastq.gz R2.fastq.gz \
+    R1_paired.fastq.gz /dev/null R2_paired.fastq.gz R2_unpaired.fastq.gz \
+    ILLUMINACLIP:adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:20 MINLEN:30
+  ```
 
 ---
 
