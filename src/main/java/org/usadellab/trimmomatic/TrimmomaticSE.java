@@ -64,7 +64,7 @@ public class TrimmomaticSE extends Trimmomatic {
 			done = recs1.size() == 0;
 
 			BlockOfRecords bor = new BlockOfRecords(recs1, null);
-			BlockOfWork work = new BlockOfWork(logger, trimmers, bor, done, false, trimLog != null, serializers,
+			BlockOfWork work = new BlockOfWork(logger, trimmers, bor, done, false, 0, trimLog != null, serializers,
 					exceptionHolder);
 
 			List<SerializedBlock> buffers = work.getBlocks();

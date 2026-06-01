@@ -53,7 +53,7 @@ public class MultiThreadedCompressionTest {
         BlockOfRecords bor = new BlockOfRecords(records, null);
 
         // Create the 'BlockOfWork' which is the task to be run on a separate thread.
-        BlockOfWork work = new BlockOfWork(null, trimmers, bor, true, false, false, serializers, exceptionHolder);
+        BlockOfWork work = new BlockOfWork(null, trimmers, bor, true, false, 0, false, serializers, exceptionHolder);
         
         
         // 2. ACT: Submit the work to the pipeline.

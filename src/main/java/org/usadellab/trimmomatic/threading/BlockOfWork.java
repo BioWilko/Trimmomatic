@@ -20,6 +20,8 @@ public class BlockOfWork implements Callable<BlockOfRecords> {
 	private BlockOfRecords bor;
 
 	private boolean pe;
+	// 0 = normal symmetric PE; 1 = R1 is the technical read; 2 = R2 is the technical read.
+	private int technicalRead;
 	private boolean trimLog;
 
 	private List<SerializedBlock> blocks;
@@ -27,14 +29,15 @@ public class BlockOfWork implements Callable<BlockOfRecords> {
 
 	private ExceptionHolder exceptionHolder;
 
-	public BlockOfWork(Logger logger, Trimmer trimmers[], BlockOfRecords bor, boolean last, boolean pe, boolean trimLog,
-			List<Serializer> serializers, ExceptionHolder exceptionHolder) {
+	public BlockOfWork(Logger logger, Trimmer trimmers[], BlockOfRecords bor, boolean last, boolean pe,
+			int technicalRead, boolean trimLog, List<Serializer> serializers, ExceptionHolder exceptionHolder) {
 		this.logger = logger;
 
 		this.trimmers = trimmers;
 		this.bor = bor;
 
 		this.pe = pe;
+		this.technicalRead = technicalRead;
 		this.trimLog = trimLog;
 
 		blocks = new ArrayList<SerializedBlock>();
@@ -105,34 +108,81 @@ public class BlockOfWork implements Callable<BlockOfRecords> {
 		for (int i = 0; i < len; i++) {
 			originalRecs[0] = originalRecs1.get(i);
 			originalRecs[1] = originalRecs2.get(i);
-			FastqRecord recs[] = originalRecs;
 
-			for (int j = 0; j < trimmers.length; j++) {
-				try {
-					recs = trimmers[j].processRecords(recs);
-				} catch (RuntimeException e) {
-					logger.errorln("Exception processing reads: " + originalRecs[0].getName() + " and "
-							+ originalRecs[1].getName());
-					throw e;
+			if (technicalRead != 0) {
+				// Asymmetric PE: one read is a technical read (barcode/UMI) that passes
+				// through completely untouched; all trimmers run on the biological read only.
+				// If the biological read is dropped, both reads are discarded — the technical
+				// read NEVER goes to the unpaired output.
+				int bioIdx  = (technicalRead == 1) ? 1 : 0;
+				int techIdx = (technicalRead == 1) ? 0 : 1;
+
+				// Run all trimmers on the biological read in SE mode (single-element array).
+				FastqRecord[] bioArray = { originalRecs[bioIdx] };
+				for (int j = 0; j < trimmers.length; j++) {
+					try {
+						bioArray = trimmers[j].processRecords(bioArray);
+					} catch (RuntimeException e) {
+						logger.errorln("Exception processing bio read: " + originalRecs[bioIdx].getName());
+						throw e;
+					}
 				}
-			}
 
-			if (recs[0] != null && recs[1] != null) {
-				trimmedRecs1P.add(recs[0]);
-				trimmedRecs2P.add(recs[1]);
-			} else if (recs[0] != null)
-				trimmedRecs1U.add(recs[0]);
-			else if (recs[1] != null)
-				trimmedRecs2U.add(recs[1]);
+				FastqRecord bioResult  = bioArray[0];
+				FastqRecord techRecord = originalRecs[techIdx];
 
-			stats.logPair(originalRecs, recs);
+				if (bioResult != null) {
+					// Bio read survived → emit pair; tech read is passed through verbatim.
+					if (technicalRead == 1) {
+						trimmedRecs1P.add(techRecord); // R1 = technical
+						trimmedRecs2P.add(bioResult);  // R2 = biological
+					} else {
+						trimmedRecs1P.add(bioResult);  // R1 = biological
+						trimmedRecs2P.add(techRecord); // R2 = technical
+					}
+				}
+				// Bio read dropped → both discarded. Technical read NEVER goes to unpaired.
 
-			if (trimLog) {
-				if (originalRecs[0] != null)
-					trimLogList.add(makeTrimLogRec(recs[0], originalRecs[0]));
+				// Stats: pair survives iff bio survives; they always move together.
+				FastqRecord[] recsForStats = new FastqRecord[2];
+				recsForStats[bioIdx]  = bioResult;
+				recsForStats[techIdx] = (bioResult != null) ? techRecord : null;
+				stats.logPair(originalRecs, recsForStats);
 
-				if (originalRecs[1] != null)
-					trimLogList.add(makeTrimLogRec(recs[1], originalRecs[1]));
+				if (trimLog) {
+					trimLogList.add(makeTrimLogRec(recsForStats[0], originalRecs[0]));
+					trimLogList.add(makeTrimLogRec(recsForStats[1], originalRecs[1]));
+				}
+			} else {
+				// Normal symmetric PE processing.
+				FastqRecord recs[] = originalRecs;
+
+				for (int j = 0; j < trimmers.length; j++) {
+					try {
+						recs = trimmers[j].processRecords(recs);
+					} catch (RuntimeException e) {
+						logger.errorln("Exception processing reads: " + originalRecs[0].getName() + " and "
+								+ originalRecs[1].getName());
+						throw e;
+					}
+				}
+
+				if (recs[0] != null && recs[1] != null) {
+					trimmedRecs1P.add(recs[0]);
+					trimmedRecs2P.add(recs[1]);
+				} else if (recs[0] != null)
+					trimmedRecs1U.add(recs[0]);
+				else if (recs[1] != null)
+					trimmedRecs2U.add(recs[1]);
+
+				stats.logPair(originalRecs, recs);
+
+				if (trimLog) {
+					if (originalRecs[0] != null)
+						trimLogList.add(makeTrimLogRec(recs[0], originalRecs[0]));
+					if (originalRecs[1] != null)
+						trimLogList.add(makeTrimLogRec(recs[1], originalRecs[1]));
+				}
 			}
 		}
 
