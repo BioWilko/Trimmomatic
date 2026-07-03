@@ -35,7 +35,7 @@ A Java-based processing and trimming tool for Illumina NGS sequencing data, deve
 
 The easiest option is to download a binary release zip, and unpack it somewhere convenient. You'll need to modify the example command lines below to reference the trimmomatic JAR file and the location of the adapter fasta files.
 
-### Simplified Invocation (v0.42+)
+### Simplified Invocation (v0.41+)
 
 For standard cleaning of Illumina data, you can now invoke Trimmomatic with just the input files. Output files will be created in the same folder as the input files and named automatically (appending `.trimmed.fq.gz` for single read files or `.trimmed.paired.fq.gz` & `.trimmed.unpaired.fq.gz` for paired end read files), and standard trimming steps will be applied — `ILLUMINACLIP:TruSeq3-SE-GGGGG.fa:2:30:10` (TruSeq3 single-end adapters plus a polyG sequence for NovaSeq two-colour chemistry) for single-end input, or `ILLUMINACLIP:TruSeq3-PE-2-GGGGG.fa:2:30:10` (TruSeq3 paired-end adapters plus a polyG sequence) for paired-end input — followed by `SLIDINGWINDOW:4:20 MINLEN:36`. This mode also automatically detects and uses all available processor threads.
 
