@@ -41,8 +41,8 @@ public abstract class TrimLogCollector {
 	}
 
 	protected void logRec(TrimLogRecord rec) {
-		trimLogStream.printf("%s %d %d %d %d\n", rec.getReadName(), rec.getLength(), rec.getStartPos(), rec.getEndPos(),
-				rec.getTrimTail());
+		trimLogStream.printf("%s %d %d %d %d\n", rec.readName(), rec.length(), rec.startPos(), rec.endPos(),
+				rec.trimTail());
 	}
 
 	public void close() throws Exception {

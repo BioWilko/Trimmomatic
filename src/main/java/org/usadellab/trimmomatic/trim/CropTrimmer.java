@@ -26,7 +26,7 @@ public class CropTrimmer extends AbstractSingleRecordTrimmer {
 
 	@Override
 	public FastqRecord processRecord(FastqRecord in) {
-		if (in.getSequence().length() < len)
+		if (in.getLength() < len)
 			return in;
 
 		return new FastqRecord(in, 0, len);

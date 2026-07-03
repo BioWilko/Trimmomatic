@@ -17,6 +17,7 @@ import org.usadellab.trimmomatic.threading.serializer.SerializedBlock;
 import org.usadellab.trimmomatic.threading.serializer.Serializer;
 import org.usadellab.trimmomatic.threading.trimlog.TrimLogCollector;
 import org.usadellab.trimmomatic.threading.trimstats.TrimStatsCollector;
+import org.usadellab.trimmomatic.trim.IlluminaClippingTrimmer;
 import org.usadellab.trimmomatic.trim.Trimmer;
 import org.usadellab.trimmomatic.util.Logger;
 
@@ -28,7 +29,7 @@ public class TrimmomaticSE extends Trimmomatic {
 	}
 
 	public void processPipeline(FastqParser rawParser, File output, Trimmer trimmers[], File trimLog, File statsSummary,
-			Boolean compressBlock, Integer compressLevel, int threads) throws Exception {
+			Boolean compressBlock, Integer compressLevel, int threads, boolean verbose) throws Exception {
 		boolean useParserWorker = threads > 1;
 		boolean useSerializerWorker = threads > 1;
 		boolean useParallelCompressor = compressBlock != null ? compressBlock : threads > 1;
@@ -91,10 +92,17 @@ public class TrimmomaticSE extends Trimmomatic {
 
 		statsCollector.close();
 		logger.infoln(statsCollector.getStats().processStatsSE(statsSummary));
+
+		if (verbose) {
+			for (Trimmer t : trimmers) {
+				if (t instanceof IlluminaClippingTrimmer ict)
+					ict.printStats(logger);
+			}
+		}
 	}
 
 	public void process(File input, File output, Trimmer trimmers[], int phredOffset, File trimLog, File statsSummary,
-			Boolean compressBlock, Integer compressLevel, int threads) throws Exception {
+			Boolean compressBlock, Integer compressLevel, int threads, boolean verbose) throws Exception {
 		FastqParser parser = new FastqParser(phredOffset);
 		parser.open(input);
 
@@ -109,7 +117,7 @@ public class TrimmomaticSE extends Trimmomatic {
 			}
 		}
 
-		processPipeline(parser, output, trimmers, trimLog, statsSummary, compressBlock, compressLevel, threads);
+		processPipeline(parser, output, trimmers, trimLog, statsSummary, compressBlock, compressLevel, threads, verbose);
 
 	}
 
@@ -125,6 +133,7 @@ public class TrimmomaticSE extends Trimmomatic {
 
 		boolean quiet = false;
 		boolean showVersion = false;
+		boolean verbose = false;
 
 		Boolean compressBlock = null;
 		Integer compressLevel = null;
@@ -170,6 +179,8 @@ public class TrimmomaticSE extends Trimmomatic {
 					compressBlock = true;
 				else if (arg.equals("-quiet"))
 					quiet = true;
+				else if (arg.equals("-verbose"))
+					verbose = true;
 				else if (arg.equals("-version"))
 					showVersion = true;
 				else {
@@ -206,7 +217,7 @@ public class TrimmomaticSE extends Trimmomatic {
 		Trimmer trimmers[] = createTrimmers(logger, nonOptionArgsIter);
 
 		TrimmomaticSE tm = new TrimmomaticSE(logger);
-		tm.process(input, output, trimmers, phredOffset, trimLog, statsSummary, compressBlock, compressLevel, threads);
+		tm.process(input, output, trimmers, phredOffset, trimLog, statsSummary, compressBlock, compressLevel, threads, verbose);
 
 		logger.infoln("TrimmomaticSE: Completed successfully");
 		return true;
@@ -215,7 +226,7 @@ public class TrimmomaticSE extends Trimmomatic {
 	public static void main(String[] args) throws Exception {
 		if (!run(args)) {
 			System.err.println(
-					"Usage: TrimmomaticSE [-version] [-threads <threads>] [-phred33|-phred64] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-compressLevel <lvl>] [-compressStream|-compressBlock] <inputFile> <outputFile> <trimmer1>...");
+					"Usage: TrimmomaticSE [-version] [-threads <threads>] [-phred33|-phred64] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-verbose] [-compressLevel <lvl>] [-compressStream|-compressBlock] <inputFile> <outputFile> <trimmer1>...");
 			System.exit(1);
 		}
 	}

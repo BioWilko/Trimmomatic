@@ -71,18 +71,13 @@ public class FastaRecord {
 	}
 
 	public static char complementChar(char ch) {
-		switch (ch) {
-		case 'A':
-			return 'T';
-		case 'C':
-			return 'G';
-		case 'G':
-			return 'C';
-		case 'T':
-			return 'A';
-		}
-
-		return 'N';
+		return switch (ch) {
+			case 'A' -> 'T';
+			case 'C' -> 'G';
+			case 'G' -> 'C';
+			case 'T' -> 'A';
+			default -> 'N';
+		};
 	}
 
 	public static String getComplementSequence(String sequence) {

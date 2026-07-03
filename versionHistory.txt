@@ -62,4 +62,24 @@ Version 0.40: Feature: Parallel GZIP/BZIP2 compression
               Feature: Added first JUnit tests
               Feature: Moved to Java 8
 
-
+Version 0.41: Fix: Bug in IlluminaClippingTrimmer calculateMaximumRange
+              Feature: Added extensive JUnit tests
+              Performance: Major optimizations in BarcodeSplitter (array-based lookups, loop unswitching, char[] comparison) and fix for short reads
+              Performance: Optimized Bzip2 compression (buffer pre-allocation) and CompressionFormat detection
+              Feature: Moved to Java 25
+              Feature: Replaced Jbzip2 with Apache Commons Compress (concatenated streams)
+              Feature: Updated dependencies (Mockito, ByteBuddy, JUnit)
+              Feature: Added verbose adapter reporting (-verbose flag)
+              Feature: Simplified invocation mode with automatic output filenames and default trimming steps
+              Performance: Parallel open of paired-end input files using virtual threads
+              Performance: FastqRecord quality integer array cached on first access, eliminating repeated allocation per trimmer
+              Performance: FastqRecord trim copy constructor stores a view (offset+length) instead of calling substring(), deferring string materialisation to serialisation time
+              Performance: FastqSerializer.writeRecord() writes directly to BufferedWriter, removing per-record StringBuilder allocation
+              Performance: ThreadedPipeline task queue widened (threads*2 -> threads*8); sleep(100) busy-wait replaced by blocking RejectedExecutionHandler
+              Performance: SerializedBlockQueue compression and output queues widened (buffers -> buffers*2)
+              Performance: UncompressedBlockData pre-sizes ByteArrayOutputStream from record lengths and exposes internal buffer to avoid the toByteArray() copy
+              Performance: IlluminaClippingTrimmer pre-computes packSeqExternal once per read before adapter loops; packPrefixAndSeq() helper eliminates string concatenation in palindrome matching
+              Internal: GzipBlockData, Bzip2BlockData, TrimLogRecord converted to records; BlockData sealed interface
+              Internal: SerializedBlock manual Future<BlockData> replaced with CompletableFuture, removing synchronized/wait/notifyAll
+              Internal: Switch statements converted to switch expressions throughout (CompressionFormat, FastaRecord, IlluminaClippingTrimmer)
+              Fix: ILLUMINACLIP adapter lookup now also searches adapters/ subdirectory in the current working directory, fixing simplified invocation when the JAR is not co-located with the adapters/ folder

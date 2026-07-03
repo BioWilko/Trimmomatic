@@ -10,6 +10,18 @@ public class FastqRecord {
 	private int phredOffset;
 	private int headPos;
 
+	// View fields — non-null only when this record is a trimmed view of another.
+	// Avoids substring() allocations for intermediate trimming steps; sequence and
+	// quality are materialised lazily on first access via getSequence()/getQuality().
+	private String rawSequence;
+	private String rawQuality;
+	private int viewOffset;
+	private int viewLength;
+
+	// Quality integer arrays — computed lazily and invalidated when phredOffset changes.
+	private int[] qualityCacheRaw;
+	private int[] qualityCacheZeroNs;
+
 	public FastqRecord(String name, String sequence, String comment, String quality, int phredOffset) {
 		this.name = name;
 		this.sequence = sequence;
@@ -27,19 +39,26 @@ public class FastqRecord {
 	public FastqRecord(FastqRecord base, int headPos, int length) {
 		if (headPos < 0)
 			throw new RuntimeException("Attempting invalid trim on " + base.name + " with length "
-					+ base.sequence.length() + ": Wanted " + headPos + " to " + (headPos + length));
+					+ base.getLength() + ": Wanted " + headPos + " to " + (headPos + length));
 
-		int availableLength = base.getSequence().length();
+		int availableLength = base.getLength();
 		if (headPos + length > availableLength)
 			length = availableLength - headPos;
 
-		this.sequence = base.sequence.substring(headPos, headPos + length);
-		this.quality = base.quality.substring(headPos, headPos + length);
-		this.name = base.name;
-		this.comment = base.comment;
-		this.phredOffset = base.phredOffset;
-		this.headPos = base.headPos + headPos;
+		if (length < 0)
+			throw new StringIndexOutOfBoundsException(
+					"begin " + headPos + ", end " + (headPos + length) + ", length " + availableLength);
 
+		// Chain directly to the root raw strings so layered views never form.
+		this.rawSequence = (base.rawSequence != null) ? base.rawSequence : base.sequence;
+		this.rawQuality  = (base.rawQuality  != null) ? base.rawQuality  : base.quality;
+		this.viewOffset  = (base.rawSequence != null) ? (base.viewOffset + headPos) : headPos;
+		this.viewLength  = length;
+
+		this.name        = base.name;
+		this.comment     = base.comment;
+		this.phredOffset = base.phredOffset;
+		this.headPos     = base.headPos + headPos;
 		this.barcodeLabel = base.barcodeLabel;
 	}
 
@@ -66,11 +85,17 @@ public class FastqRecord {
 		return make(name, sequence, 40);
 	}
 
+	public int getLength() {
+		return (rawSequence != null) ? viewLength : sequence.length();
+	}
+
 	public String getName() {
 		return name;
 	}
 
 	public String getSequence() {
+		if (sequence == null)
+			sequence = rawSequence.substring(viewOffset, viewOffset + viewLength);
 		return sequence;
 	}
 
@@ -87,6 +112,8 @@ public class FastqRecord {
 	}
 
 	public String getQuality() {
+		if (quality == null)
+			quality = rawQuality.substring(viewOffset, viewOffset + viewLength);
 		return quality;
 	}
 
@@ -96,6 +123,8 @@ public class FastqRecord {
 
 	void setPhredOffset(int phredOffset) {
 		this.phredOffset = phredOffset;
+		this.qualityCacheRaw = null;
+		this.qualityCacheZeroNs = null;
 	}
 
 	public int getHeadPos() {
@@ -103,23 +132,99 @@ public class FastqRecord {
 	}
 
 	public int[] getQualityAsInteger(boolean zeroNs) {
-		int arr[] = new int[quality.length()];
-
-		for (int i = 0; i < quality.length(); i++) {
-			if (zeroNs && sequence.charAt(i) == 'N')
-				arr[i] = 0;
-			else
-				arr[i] = quality.charAt(i) - phredOffset;
+		if (zeroNs) {
+			if (qualityCacheZeroNs != null)
+				return qualityCacheZeroNs;
+		} else {
+			if (qualityCacheRaw != null)
+				return qualityCacheRaw;
 		}
+
+		int[] arr;
+
+		if (rawQuality != null) {
+			arr = new int[viewLength];
+			for (int i = 0; i < viewLength; i++) {
+				if (zeroNs && rawSequence.charAt(viewOffset + i) == 'N')
+					arr[i] = 0;
+				else
+					arr[i] = rawQuality.charAt(viewOffset + i) - phredOffset;
+			}
+		} else {
+			arr = new int[quality.length()];
+			for (int i = 0; i < quality.length(); i++) {
+				if (zeroNs && sequence.charAt(i) == 'N')
+					arr[i] = 0;
+				else
+					arr[i] = quality.charAt(i) - phredOffset;
+			}
+		}
+
+		if (zeroNs)
+			qualityCacheZeroNs = arr;
+		else
+			qualityCacheRaw = arr;
 
 		return arr;
 	}
 
-	private static int RECORD_ADDED_LENGTH = 10; // 4 newlines (2 characters each), @ and +
+	private static int RECORD_ADDED_LENGTH = 10;
 
 	public int getRecordLength() {
-		return this.name.length() + this.sequence.length() + this.comment.length() + this.quality.length()
-				+ RECORD_ADDED_LENGTH;
+		int seqLen = getLength();
+		return this.name.length() + seqLen + this.comment.length() + seqLen + RECORD_ADDED_LENGTH;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((comment == null) ? 0 : comment.hashCode());
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + phredOffset;
+		String q = getQuality();
+		result = prime * result + ((q == null) ? 0 : q.hashCode());
+		String s = getSequence();
+		result = prime * result + ((s == null) ? 0 : s.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		FastqRecord other = (FastqRecord) obj;
+		if (comment == null) {
+			if (other.comment != null)
+				return false;
+		} else if (!comment.equals(other.comment))
+			return false;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		if (phredOffset != other.phredOffset)
+			return false;
+		String q = getQuality();
+		String oq = other.getQuality();
+		if (q == null) {
+			if (oq != null)
+				return false;
+		} else if (!q.equals(oq))
+			return false;
+		String s = getSequence();
+		String os = other.getSequence();
+		if (s == null) {
+			if (os != null)
+				return false;
+		} else if (!s.equals(os))
+			return false;
+		return true;
 	}
 
 }

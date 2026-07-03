@@ -6,11 +6,11 @@ import java.io.OutputStream;
 public interface ParallelCompressor {
 	BlockOutputStream wrapAndWriteHeader(OutputStream stream) throws IOException;
 
-	void updateChecksumPreCompression(UncompressedBlockData current);
+	default void updateChecksumPreCompression(UncompressedBlockData current) {}
 
 	BlockData compress(UncompressedBlockData previous, UncompressedBlockData current) throws Exception;
 
-	void updateChecksumPostCompression(BlockData current);
+	default void updateChecksumPostCompression(BlockData current) {}
 
-	void writeTrailer(BlockOutputStream stream) throws IOException;
+	default void writeTrailer(BlockOutputStream stream) throws IOException {}
 }

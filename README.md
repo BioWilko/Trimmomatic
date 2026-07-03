@@ -11,6 +11,8 @@ A Java-based processing and trimming tool for Illumina NGS sequencing data, deve
 
 - [Quick Start](#quick-start)
   - [Installation](#installation)
+  - [Simplified Invocation (v0.41+)](#simplified-invocation-v041)
+    - [Note for HPC users](#note-for-hpc-users-sge-slurm-lsf-pbs)
   - [Paired End](#paired-end)
   - [Single End](#single-end)
 - [de.NBI & ELIXIR Service](#trimmomatic-is-a-denbi--elixir-service)
@@ -33,6 +35,39 @@ A Java-based processing and trimming tool for Illumina NGS sequencing data, deve
 
 The easiest option is to download a binary release zip, and unpack it somewhere convenient. You'll need to modify the example command lines below to reference the trimmomatic JAR file and the location of the adapter fasta files.
 
+### Simplified Invocation (v0.41+)
+
+For standard cleaning of Illumina data, you can now invoke Trimmomatic with just the input files. Output files will be created in the same folder as the input files and named automatically (appending `.trimmed.fq.gz` for single read files or `.trimmed.paired.fq.gz` & `.trimmed.unpaired.fq.gz` for paired end read files), and standard trimming steps will be applied — `ILLUMINACLIP:TruSeq3-SE-GGGGG.fa:2:30:10` (TruSeq3 single-end adapters plus a polyG sequence for NovaSeq two-colour chemistry) for single-end input, or `ILLUMINACLIP:TruSeq3-PE-2-GGGGG.fa:2:30:10` (TruSeq3 paired-end adapters plus a polyG sequence) for paired-end input — followed by `SLIDINGWINDOW:4:20 MINLEN:36`. This mode also automatically detects and uses all available processor threads.
+
+```bash
+java -jar Trimmomatic-0.41.jar input.fq.gz
+```
+
+or
+
+```bash
+java -jar Trimmomatic-0.41.jar input_R1.fq.gz input_R2.fq.gz
+```
+
+#### Note for HPC users (SGE, SLURM, LSF, PBS)
+
+On HPC nodes where the scheduler does not restrict CPU visibility via cgroups (common on SGE and some SLURM configurations), the JVM and the system C library both report the **full node CPU count** regardless of how many slots were allocated to the job. Simplified invocation uses `availableProcessors()` to set the thread count, which can be the full node count (e.g. 256). This causes the system memory allocator (glibc) to reserve virtual address space proportional to that CPU count (up to 8 × cores × 64 MB per arena), which can exhaust the per-job virtual memory limit (`ulimit -v`) before any reads are processed — even when the node has abundant physical RAM.
+
+The recommended fix is to combine `MALLOC_ARENA_MAX=2` (prevents the virtual memory crash) with `-XX:ActiveProcessorCount` (caps the thread count to the allocated slots):
+
+| Scheduler | Recommended invocation |
+|-----------|------------------------|
+| SGE       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NSLOTS -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
+| SLURM     | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$SLURM_CPUS_PER_TASK -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
+| LSF       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$LSB_DJOB_NUMPROC -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
+| PBS/Torque | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NCPUS -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
+
+`MALLOC_ARENA_MAX=2` alone prevents the crash but does not fix the thread count — without `-XX:ActiveProcessorCount`, simplified invocation will still attempt to use the full node CPU count. Memory requirements with the correct thread count: ~8 GiB for single-end, ~16 GiB for paired-end on large datasets.
+
+Alternatively, use explicit `PE`/`SE` mode with `-threads` set to the allocated slot count, which avoids both issues without needing the JVM flag.
+
+---
+
 ### Paired End
 
 With most new data sets you can use gentle quality trimming and adapter clipping.
@@ -42,7 +77,7 @@ You often don't need leading and trailing clipping. Also in general setting the 
 If you have questions please don't hesitate to contact us, this is not necessarily one size fits all. (e.g. RNAseq expression analysis vs DNA assembly).
 
 ```bash
-java -jar trimmomatic-0.40.jar PE \
+java -jar Trimmomatic-0.41.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -52,7 +87,7 @@ ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36
 for reference only (less sensitive for adapters):
 
 ```bash
-java -jar trimmomatic-0.40.jar PE \
+java -jar Trimmomatic-0.41.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -72,7 +107,7 @@ This will perform the following:
 To perform the same steps using a single-ended adapter file, run:
 
 ```bash
-java -jar trimmomatic-0.40.jar SE \
+java -jar Trimmomatic-0.41.jar SE \
 input.fq.gz \
 output.fq.gz \
 ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 \
@@ -90,7 +125,7 @@ This software is provided as a service by the German Network for Bioinformatics 
 
 ## Build from Source
 
-To build Trimmomatic from source, you will need a Java Development Kit (JDK 8 or higher) and Apache Maven.
+To build Trimmomatic from source, you will need a Java Development Kit (JDK 25 or higher) and Apache Maven.
 
 Clone the repository, change into the top-level directory, and build using the following Maven command:
 
@@ -109,7 +144,7 @@ Since version 0.27, trimmomatic can be executed using -jar. The 'old' method, us
 ```
 java -jar <path to trimmomatic.jar> PE [-threads <threads>] [-phred33 | -phred64] \
 [-trimlog <logFile>] [-summary <summaryFile>] [-basein <templateInputFile>] [-baseout <templateOutputFile>] \
-[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input 1> <input 2> \
 <paired output 1> <unpaired output 1> \
 <paired output 2> <unpaired output 2> \
@@ -121,7 +156,7 @@ or
 ```
 java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticPE [-threads <threads>] [-phred33 | -phred64] \
 [-trimlog <logFile>] [-summary <summaryFile>] [-basein <templateInputFile>] [-baseout <templateOutputFile>] \
-[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-validatePairs] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input 1> <input 2> \
 <paired output 1> <unpaired output 1> \
 <paired output 2> <unpaired output 2> \
@@ -132,7 +167,7 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticP
 
 ```
 java -jar <path to trimmomatic jar> SE [-threads <threads>] [-phred33 | -phred64] \
-[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input> <output> \
 <step 1> # Additional steps added as needed
 ```
@@ -141,7 +176,7 @@ or
 
 ```
 java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticSE [-threads <threads>] [-phred33 | -phred64] \
-[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-version] \
+[-trimlog <logFile>] [-summary <summaryFile>] [-compressLevel <level>] [-compressStream | -compressBlock] [-quiet] [-verbose] [-version] \
 <input> <output> \
 <step 1> # Additional steps added as needed
 ```
@@ -160,6 +195,7 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticS
 * `-compressLevel <level>`: sets the compression level for BZIP2/GZ output files (1=fastest, 9=best compression).
 * `-compressStream` | `-compressBlock`: specifies the compression mode. Block compression is the default.
 * `-quiet`: suppresses progress output to the console.
+* `-verbose`: enables detailed reporting of adapter removal statistics when using the ILLUMINACLIP step.
 * `-version`: prints the Trimmomatic version number to the console.
 
 ---
@@ -196,7 +232,7 @@ Multiple steps can be specified as required, by using additional arguments at th
 Most steps take one or more settings, delimited by `:`.
 
 * `ILLUMINACLIP:<fastaWithAdaptersEtc>:<seed mismatches>:<palindrome clip threshold>:<simple clip threshold>:<minAdapterLengthPalindrome>:<keepBothReads>`
-    * `fastaWithAdaptersEtc`: specifies the path to a fasta file containing all the adapters, PCR sequences etc. The naming of the various sequences within this file determines how they are used. See below.
+    * `fastaWithAdaptersEtc`: specifies the path to a fasta file containing all the adapters, PCR sequences etc. The naming of the various sequences within this file determines how they are used. See below. If a bare filename (no path separator) is given, Trimmomatic searches for it in: (1) the `adapters/` directory next to the JAR, (2) the current working directory, and (3) an `adapters/` subdirectory of the current working directory.
     * `seedMismatches`: specifies the maximum mismatch count which will still allow a full match to be performed
     * `palindromeClipThreshold`: specifies how accurate the match between the two 'adapter ligated' reads must be for PE palindrome read alignment.
     * `simpleClipThreshold`: specifies how accurate the match between any adapter etc. sequence must be against a read.

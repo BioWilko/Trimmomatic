@@ -23,7 +23,7 @@ public class BaseCountTrimmer extends AbstractSingleRecordTrimmer {
 			minCount = Integer.parseInt(split[1]);
 
 			if (split.length > 2)
-				maxCount = new Integer(split[2]);
+				maxCount = Integer.valueOf(split[2]);
 		}
 	}
 

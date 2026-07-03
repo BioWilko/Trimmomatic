@@ -15,7 +15,7 @@ public class MaxLenTrimmer extends AbstractSingleRecordTrimmer {
 
 	@Override
 	public FastqRecord processRecord(FastqRecord in) {
-		if (in.getSequence().length() <= maxLen)
+		if (in.getLength() <= maxLen)
 			return in;
 
 		return null;

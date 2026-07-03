@@ -1,5 +1,5 @@
 # --- Stage 1: Unpack and Prepare ---
-FROM eclipse-temurin:8-jre-focal as preparer
+FROM eclipse-temurin:25-jre as preparer
 # Re-declare ARG for this stage
 ARG TRIMMOMATIC_VERSION
 RUN apt-get update && apt-get install -y unzip
@@ -9,7 +9,7 @@ COPY target/Trimmomatic-${TRIMMOMATIC_VERSION}.zip trimmomatic.zip
 RUN unzip trimmomatic.zip
 
 # --- Stage 2: Build the Final Image ---
-FROM eclipse-temurin:8-jre-focal
+FROM eclipse-temurin:25-jre
 # Re-declare ARG for this stage
 ARG TRIMMOMATIC_VERSION
 WORKDIR /opt/trimmomatic

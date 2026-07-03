@@ -18,6 +18,7 @@ import org.usadellab.trimmomatic.threading.serializer.SerializedBlock;
 import org.usadellab.trimmomatic.threading.serializer.Serializer;
 import org.usadellab.trimmomatic.threading.trimlog.TrimLogCollector;
 import org.usadellab.trimmomatic.threading.trimstats.TrimStatsCollector;
+import org.usadellab.trimmomatic.trim.IlluminaClippingTrimmer;
 import org.usadellab.trimmomatic.trim.Trimmer;
 import org.usadellab.trimmomatic.util.Logger;
 
@@ -30,7 +31,7 @@ public class TrimmomaticPE extends Trimmomatic {
 
 	public void processPipeline(FastqParser rawParser1, FastqParser rawParser2, File output1P, File output1U,
 			File output2P, File output2U, Trimmer trimmers[], File trimLog, File statsSummary,
-			PairingValidator pairingValidator, Boolean compressBlock, Integer compressLevel, int threads)
+			PairingValidator pairingValidator, Boolean compressBlock, Integer compressLevel, int threads, boolean verbose)
 			throws Exception {
 		boolean useParserWorkers = threads > 1;
 		boolean useSerializerWorkers = threads > 1;
@@ -134,16 +135,34 @@ public class TrimmomaticPE extends Trimmomatic {
 		statsCollector.close();
 
 		logger.infoln(statsCollector.getStats().processStatsPE(statsSummary));
+
+		if (verbose) {
+			for (Trimmer t : trimmers) {
+				if (t instanceof IlluminaClippingTrimmer ict)
+					ict.printStats(logger);
+			}
+		}
 	}
 
 	public void process(File input1, File input2, File output1P, File output1U, File output2P, File output2U,
 			Trimmer trimmers[], int phredOffset, File trimLog, File statsSummary, boolean validatePairing,
-			Boolean compressBlock, Integer compressLevel, int threads) throws Exception {
+			Boolean compressBlock, Integer compressLevel, int threads, boolean verbose) throws Exception {
 		FastqParser parser1 = new FastqParser(phredOffset);
-		parser1.open(input1);
-
 		FastqParser parser2 = new FastqParser(phredOffset);
-		parser2.open(input2);
+
+		Exception[] openErrors = new Exception[2];
+		Thread t1 = Thread.ofVirtual().start(() -> {
+			try { parser1.open(input1); }
+			catch (Exception e) { openErrors[0] = e; }
+		});
+		Thread t2 = Thread.ofVirtual().start(() -> {
+			try { parser2.open(input2); }
+			catch (Exception e) { openErrors[1] = e; }
+		});
+		t1.join();
+		t2.join();
+		if (openErrors[0] != null) throw openErrors[0];
+		if (openErrors[1] != null) throw openErrors[1];
 
 		if (phredOffset == 0) {
 			int phred1 = parser1.determinePhredOffset();
@@ -165,7 +184,7 @@ public class TrimmomaticPE extends Trimmomatic {
 			pairingValidator = new PairingValidator(logger);
 
 		processPipeline(parser1, parser2, output1P, output1U, output2P, output2U, trimmers, trimLog, statsSummary,
-				pairingValidator, compressBlock, compressLevel, threads);
+				pairingValidator, compressBlock, compressLevel, threads, verbose);
 
 	}
 
@@ -246,6 +265,7 @@ public class TrimmomaticPE extends Trimmomatic {
 		boolean validatePairs = false;
 		boolean quiet = false;
 		boolean showVersion = false;
+		boolean verbose = false;
 
 		Boolean compressBlock = null;
 		Integer compressLevel = null;
@@ -303,6 +323,8 @@ public class TrimmomaticPE extends Trimmomatic {
 					compressBlock = true;
 				else if (arg.equals("-quiet"))
 					quiet = true;
+				else if (arg.equals("-verbose"))
+					verbose = true;
 				else if (arg.equals("-version"))
 					showVersion = true;
 				else {
@@ -373,7 +395,7 @@ public class TrimmomaticPE extends Trimmomatic {
 
 		TrimmomaticPE tm = new TrimmomaticPE(logger);
 		tm.process(inputs[0], inputs[1], outputs[0], outputs[1], outputs[2], outputs[3], trimmers, phredOffset, trimLog,
-				statsSummary, validatePairs, compressBlock, compressLevel, threads);
+				statsSummary, validatePairs, compressBlock, compressLevel, threads, verbose);
 
 		logger.infoln("TrimmomaticPE: Completed successfully");
 		return true;
@@ -382,7 +404,7 @@ public class TrimmomaticPE extends Trimmomatic {
 	public static void main(String[] args) throws Exception {
 		if (!run(args)) {
 			System.err.println(
-					"Usage: [-version] [-threads <threads>] [-phred33|-phred64] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-validatePairs] [-compressLevel <lvl>] [-compressStream|-compressBlock] [-basein <inputBase> | <inputFile1> <inputFile2>] [-baseout <outputBase> | <outputFile1P> <outputFile1U> <outputFile2P> <outputFile2U>] <trimmer1>...");
+					"Usage: [-version] [-threads <threads>] [-phred33|-phred64] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-verbose] [-validatePairs] [-compressLevel <lvl>] [-compressStream|-compressBlock] [-basein <inputBase> | <inputFile1> <inputFile2>] [-baseout <outputBase> | <outputFile1P> <outputFile1U> <outputFile2P> <outputFile2U>] <trimmer1>...");
 			System.exit(1);
 		}
 	}

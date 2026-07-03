@@ -15,7 +15,7 @@ public class MinLenTrimmer extends AbstractSingleRecordTrimmer {
 
 	@Override
 	public FastqRecord processRecord(FastqRecord in) {
-		if (in.getSequence().length() >= minLen)
+		if (in.getLength() >= minLen)
 			return in;
 
 		return null;

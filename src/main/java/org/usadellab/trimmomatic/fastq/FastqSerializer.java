@@ -36,19 +36,15 @@ public class FastqSerializer {
 	}
 
 	public void writeRecord(FastqRecord record) throws IOException {
-		StringBuilder sb = new StringBuilder(record.getRecordLength());
-
-		sb.append('@');
-		sb.append(record.getName());
-		sb.append('\n');
-		sb.append(record.getSequence());
-		sb.append("\n+");
-		sb.append(record.getComment());
-		sb.append('\n');
-		sb.append(record.getQuality());
-		sb.append('\n');
-
-		writer.write(sb.toString());
+		writer.write('@');
+		writer.write(record.getName());
+		writer.write('\n');
+		writer.write(record.getSequence());
+		writer.write("\n+");
+		writer.write(record.getComment());
+		writer.write('\n');
+		writer.write(record.getQuality());
+		writer.write('\n');
 	}
 
 	public File getInputFile() {

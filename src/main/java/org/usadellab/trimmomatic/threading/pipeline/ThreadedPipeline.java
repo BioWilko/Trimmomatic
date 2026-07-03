@@ -20,7 +20,7 @@ public class ThreadedPipeline extends Pipeline {
 	public ThreadedPipeline(int threads, ExceptionHolder exceptionHolder) {
 		this.exceptionHolder = exceptionHolder;
 
-		taskQueue = new ArrayBlockingQueue<Runnable>(threads * 2);
+		taskQueue = new ArrayBlockingQueue<Runnable>(threads * 8);
 
 		ThreadFactory tf = new ThreadFactory() {
 			public Thread newThread(Runnable r) {
@@ -31,16 +31,22 @@ public class ThreadedPipeline extends Pipeline {
 		};
 
 		taskExec = new ThreadPoolExecutor(threads, threads, 0, TimeUnit.SECONDS, taskQueue, tf);
+
+		// Block the caller instead of throwing RejectedExecutionException when the
+		// queue is full. This replaces the old sleep(100) busy-wait loop.
+		taskExec.setRejectedExecutionHandler((r, executor) -> {
+			try {
+				executor.getQueue().put(r);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException(e);
+			}
+		});
 	}
 
 	public Future<BlockOfRecords> submit(BlockOfWork work) throws Exception {
-		while (taskQueue.remainingCapacity() < 1) {
-			Thread.sleep(100);
-			exceptionHolder.rethrow();
-		}
-
-		Future<BlockOfRecords> future = taskExec.submit(work);
-		return future;
+		exceptionHolder.rethrow();
+		return taskExec.submit(work);
 	}
 
 	public void close() throws InterruptedException {
