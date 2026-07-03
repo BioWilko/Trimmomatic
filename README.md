@@ -11,7 +11,8 @@ A Java-based processing and trimming tool for Illumina NGS sequencing data, deve
 
 - [Quick Start](#quick-start)
   - [Installation](#installation)
-  - [Simplified Invocation (v0.42+)](#simplified-invocation-v041)
+  - [Simplified Invocation (v0.41+)](#simplified-invocation-v041)
+    - [Note for HPC users](#note-for-hpc-users-sge-slurm-lsf-pbs)
   - [Paired End](#paired-end)
   - [Single End](#single-end)
 - [de.NBI & ELIXIR Service](#trimmomatic-is-a-denbi--elixir-service)
@@ -47,6 +48,25 @@ or
 ```bash
 java -jar Trimmomatic-0.42.jar input_R1.fq.gz input_R2.fq.gz
 ```
+
+#### Note for HPC users (SGE, SLURM, LSF, PBS)
+
+On HPC nodes where the scheduler does not restrict CPU visibility via cgroups (common on SGE and some SLURM configurations), the JVM and the system C library both report the **full node CPU count** regardless of how many slots were allocated to the job. Simplified invocation uses `availableProcessors()` to set the thread count, which can be the full node count (e.g. 256). This causes the system memory allocator (glibc) to reserve virtual address space proportional to that CPU count (up to 8 × cores × 64 MB per arena), which can exhaust the per-job virtual memory limit (`ulimit -v`) before any reads are processed — even when the node has abundant physical RAM.
+
+The recommended fix is to combine `MALLOC_ARENA_MAX=2` (prevents the virtual memory crash) with `-XX:ActiveProcessorCount` (caps the thread count to the allocated slots):
+
+| Scheduler | Recommended invocation |
+|-----------|------------------------|
+| SGE       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NSLOTS -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
+| SLURM     | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$SLURM_CPUS_PER_TASK -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
+| LSF       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$LSB_DJOB_NUMPROC -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
+| PBS/Torque | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NCPUS -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
+
+`MALLOC_ARENA_MAX=2` alone prevents the crash but does not fix the thread count — without `-XX:ActiveProcessorCount`, simplified invocation will still attempt to use the full node CPU count. Memory requirements with the correct thread count: ~8 GiB for single-end, ~16 GiB for paired-end on large datasets.
+
+Alternatively, use explicit `PE`/`SE` mode with `-threads` set to the allocated slot count, which avoids both issues without needing the JVM flag.
+
+---
 
 ### Paired End
 
