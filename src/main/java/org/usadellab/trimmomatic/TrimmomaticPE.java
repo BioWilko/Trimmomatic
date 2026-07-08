@@ -12,6 +12,7 @@ import org.usadellab.trimmomatic.fastq.PairingValidator;
 import org.usadellab.trimmomatic.threading.BlockOfRecords;
 import org.usadellab.trimmomatic.threading.BlockOfWork;
 import org.usadellab.trimmomatic.threading.ExceptionHolder;
+import org.usadellab.trimmomatic.threading.parser.InterleavedParserPair;
 import org.usadellab.trimmomatic.threading.parser.Parser;
 import org.usadellab.trimmomatic.threading.pipeline.Pipeline;
 import org.usadellab.trimmomatic.threading.serializer.SerializedBlock;
@@ -29,10 +30,10 @@ public class TrimmomaticPE extends Trimmomatic {
 		this.logger = logger;
 	}
 
-	public void processPipeline(FastqParser rawParser1, FastqParser rawParser2, File output1P, File output1U,
-			File output2P, File output2U, Trimmer trimmers[], File trimLog, File statsSummary,
-			PairingValidator pairingValidator, Boolean compressBlock, Integer compressLevel, int threads, boolean verbose)
-			throws Exception {
+	public void processPipeline(FastqParser rawParser1, FastqParser rawParser2, boolean interleaved, File output1P,
+			File output1U, File output2P, File output2U, Trimmer trimmers[], File trimLog, File statsSummary,
+			PairingValidator pairingValidator, Boolean compressBlock, Integer compressLevel, int threads, boolean verbose,
+			int technicalRead) throws Exception {
 		boolean useParserWorkers = threads > 1;
 		boolean useSerializerWorkers = threads > 1;
 		boolean useParallelCompressor = compressBlock != null ? compressBlock : threads > 1;
@@ -42,8 +43,17 @@ public class TrimmomaticPE extends Trimmomatic {
 
 		ExceptionHolder exceptionHolder = new ExceptionHolder();
 
-		Parser parser1 = Parser.makeParser(useParserWorkers, threads, rawParser1, exceptionHolder);
-		Parser parser2 = Parser.makeParser(useParserWorkers, threads, rawParser2, exceptionHolder);
+		InterleavedParserPair interleavedPair = null;
+		Parser parser1, parser2;
+
+		if (interleaved) {
+			interleavedPair = new InterleavedParserPair(rawParser1, threads, exceptionHolder);
+			parser1 = interleavedPair.getR1Parser();
+			parser2 = interleavedPair.getR2Parser();
+		} else {
+			parser1 = Parser.makeParser(useParserWorkers, threads, rawParser1, exceptionHolder);
+			parser2 = Parser.makeParser(useParserWorkers, threads, rawParser2, exceptionHolder);
+		}
 
 		Pipeline pipeline = Pipeline.makePipeline(threads, exceptionHolder);
 
@@ -96,8 +106,8 @@ public class TrimmomaticPE extends Trimmomatic {
 				pairingValidator.validatePairs(recs1, recs2);
 
 			BlockOfRecords bor = new BlockOfRecords(recs1, recs2);
-			BlockOfWork work = new BlockOfWork(logger, trimmers, bor, done, true, trimLog != null, serializers,
-					exceptionHolder);
+			BlockOfWork work = new BlockOfWork(logger, trimmers, bor, done, true, technicalRead, trimLog != null,
+					serializers, exceptionHolder);
 
 			List<SerializedBlock> buffers = work.getBlocks();
 
@@ -119,8 +129,12 @@ public class TrimmomaticPE extends Trimmomatic {
 				logCollector.put(future);
 		}
 
-		parser1.close();
-		parser2.close();
+		if (interleaved) {
+			interleavedPair.close();
+		} else {
+			parser1.close();
+			parser2.close();
+		}
 
 		pipeline.close();
 
@@ -144,47 +158,63 @@ public class TrimmomaticPE extends Trimmomatic {
 		}
 	}
 
-	public void process(File input1, File input2, File output1P, File output1U, File output2P, File output2U,
-			Trimmer trimmers[], int phredOffset, File trimLog, File statsSummary, boolean validatePairing,
-			Boolean compressBlock, Integer compressLevel, int threads, boolean verbose) throws Exception {
+	public void process(File input1, File input2, boolean interleaved, File output1P, File output1U, File output2P,
+			File output2U, Trimmer trimmers[], int phredOffset, File trimLog, File statsSummary, boolean validatePairing,
+			Boolean compressBlock, Integer compressLevel, int threads, boolean verbose, int technicalRead)
+			throws Exception {
 		FastqParser parser1 = new FastqParser(phredOffset);
-		FastqParser parser2 = new FastqParser(phredOffset);
+		FastqParser parser2 = interleaved ? null : new FastqParser(phredOffset);
 
-		Exception[] openErrors = new Exception[2];
-		Thread t1 = Thread.ofVirtual().start(() -> {
-			try { parser1.open(input1); }
-			catch (Exception e) { openErrors[0] = e; }
-		});
-		Thread t2 = Thread.ofVirtual().start(() -> {
-			try { parser2.open(input2); }
-			catch (Exception e) { openErrors[1] = e; }
-		});
-		t1.join();
-		t2.join();
-		if (openErrors[0] != null) throw openErrors[0];
-		if (openErrors[1] != null) throw openErrors[1];
+		if (interleaved) {
+			parser1.open(input1);
+		} else {
+			Exception[] openErrors = new Exception[2];
+			Thread t1 = Thread.ofVirtual().start(() -> {
+				try { parser1.open(input1); }
+				catch (Exception e) { openErrors[0] = e; }
+			});
+			Thread t2 = Thread.ofVirtual().start(() -> {
+				try { parser2.open(input2); }
+				catch (Exception e) { openErrors[1] = e; }
+			});
+			t1.join();
+			t2.join();
+			if (openErrors[0] != null) throw openErrors[0];
+			if (openErrors[1] != null) throw openErrors[1];
+		}
 
 		if (phredOffset == 0) {
-			int phred1 = parser1.determinePhredOffset();
-			int phred2 = parser2.determinePhredOffset();
-
-			if (phred1 == phred2 && phred1 != 0) {
-				logger.infoln("Quality encoding detected as phred" + phred1);
-				parser1.setPhredOffset(phred1);
-				parser2.setPhredOffset(phred1);
+			if (interleaved) {
+				int phred1 = parser1.determinePhredOffset();
+				if (phred1 != 0) {
+					logger.infoln("Quality encoding detected as phred" + phred1);
+					parser1.setPhredOffset(phred1);
+				} else {
+					logger.errorln("Error: Unable to detect quality encoding");
+					System.exit(1);
+				}
 			} else {
-				logger.errorln("Error: Unable to detect quality encoding");
-				System.exit(1);
+				int phred1 = parser1.determinePhredOffset();
+				int phred2 = parser2.determinePhredOffset();
+
+				if (phred1 == phred2 && phred1 != 0) {
+					logger.infoln("Quality encoding detected as phred" + phred1);
+					parser1.setPhredOffset(phred1);
+					parser2.setPhredOffset(phred1);
+				} else {
+					logger.errorln("Error: Unable to detect quality encoding");
+					System.exit(1);
+				}
 			}
 		}
 
 		PairingValidator pairingValidator = null;
 
-		if (validatePairing)
+		if (validatePairing && !interleaved)
 			pairingValidator = new PairingValidator(logger);
 
-		processPipeline(parser1, parser2, output1P, output1U, output2P, output2U, trimmers, trimLog, statsSummary,
-				pairingValidator, compressBlock, compressLevel, threads, verbose);
+		processPipeline(parser1, parser2, interleaved, output1P, output1U, output2P, output2U, trimmers, trimLog,
+				statsSummary, pairingValidator, compressBlock, compressLevel, threads, verbose, technicalRead);
 
 	}
 
@@ -266,6 +296,9 @@ public class TrimmomaticPE extends Trimmomatic {
 		boolean quiet = false;
 		boolean showVersion = false;
 		boolean verbose = false;
+		boolean interleaved = false;
+		boolean longread = false;
+		int technicalRead = 0;
 
 		Boolean compressBlock = null;
 		Integer compressLevel = null;
@@ -327,7 +360,20 @@ public class TrimmomaticPE extends Trimmomatic {
 					verbose = true;
 				else if (arg.equals("-version"))
 					showVersion = true;
-				else {
+				else if (arg.equals("-interleaved"))
+					interleaved = true;
+				else if (arg.equals("-longread"))
+					longread = true;
+				else if (arg.equals("-technicalread")) {
+					if (argIndex < args.length) {
+						technicalRead = Integer.parseInt(args[argIndex++]);
+						if (technicalRead != 1 && technicalRead != 2) {
+							System.err.println("technicalread must be 1 or 2");
+							badOption = true;
+						}
+					} else
+						badOption = true;
+				} else {
 					System.err.println("Unknown option " + arg);
 					badOption = true;
 				}
@@ -338,7 +384,8 @@ public class TrimmomaticPE extends Trimmomatic {
 		if (showVersion)
 			Trimmomatic.showVersion();
 
-		int additionalArgs = 1 + (templateInput == null ? 2 : 0) + (templateOutput == null ? 4 : 0);
+		int inputFiles = interleaved ? 1 : 2;
+		int additionalArgs = 1 + (templateInput == null ? inputFiles : 0) + (templateOutput == null ? 4 : 0);
 
 		if ((nonOptionArgs.size() < additionalArgs) || badOption)
 			return showVersion;
@@ -356,11 +403,24 @@ public class TrimmomaticPE extends Trimmomatic {
 				logger.infoln("Multiple cores found: Using " + threads + " threads");
 		}
 
+		// -longread skips the expensive 10k-record phred pre-read and defaults to
+		// Phred+33 (correct for all current long-read platforms: ONT, PacBio HiFi/CLR).
+		if (longread && phredOffset == 0) {
+			phredOffset = 33;
+			logger.infoln("Long-read mode: assuming Phred+33 quality encoding");
+		}
+
 		Iterator<String> nonOptionArgsIter = nonOptionArgs.iterator();
 
 		File inputs[], outputs[];
 
-		if (templateInput != null) {
+		if (interleaved) {
+			// Interleaved mode: only one input file is needed.
+			// -basein is treated as the direct path to the interleaved file, not as a template.
+			String inputPath = (templateInput != null) ? templateInput : nonOptionArgsIter.next();
+			inputs = new File[] { new File(inputPath), null };
+			logger.infoln("Using interleaved input file: " + inputs[0]);
+		} else if (templateInput != null) {
 			inputs = calculateTemplatedInput(templateInput);
 			if (inputs == null) {
 				logger.errorln("Unable to determine input files from: " + templateInput);
@@ -394,8 +454,9 @@ public class TrimmomaticPE extends Trimmomatic {
 		Trimmer trimmers[] = createTrimmers(logger, nonOptionArgsIter);
 
 		TrimmomaticPE tm = new TrimmomaticPE(logger);
-		tm.process(inputs[0], inputs[1], outputs[0], outputs[1], outputs[2], outputs[3], trimmers, phredOffset, trimLog,
-				statsSummary, validatePairs, compressBlock, compressLevel, threads, verbose);
+		tm.process(inputs[0], inputs[1], interleaved, outputs[0], outputs[1], outputs[2], outputs[3], trimmers,
+				phredOffset, trimLog, statsSummary, validatePairs, compressBlock, compressLevel, threads, verbose,
+				technicalRead);
 
 		logger.infoln("TrimmomaticPE: Completed successfully");
 		return true;
@@ -404,7 +465,7 @@ public class TrimmomaticPE extends Trimmomatic {
 	public static void main(String[] args) throws Exception {
 		if (!run(args)) {
 			System.err.println(
-					"Usage: [-version] [-threads <threads>] [-phred33|-phred64] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-verbose] [-validatePairs] [-compressLevel <lvl>] [-compressStream|-compressBlock] [-basein <inputBase> | <inputFile1> <inputFile2>] [-baseout <outputBase> | <outputFile1P> <outputFile1U> <outputFile2P> <outputFile2U>] <trimmer1>...");
+					"Usage: [-version] [-threads <threads>] [-phred33|-phred64] [-longread] [-trimlog <trimLogFile>] [-summary <statsSummaryFile>] [-quiet] [-verbose] [-validatePairs] [-interleaved] [-technicalread <1|2>] [-compressLevel <lvl>] [-compressStream|-compressBlock] [-basein <inputBase> | <inputFile1> [<inputFile2>]] [-baseout <outputBase> | <outputFile1P> <outputFile1U> <outputFile2P> <outputFile2U>] <trimmer1>...");
 			System.exit(1);
 		}
 	}

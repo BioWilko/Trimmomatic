@@ -5,7 +5,7 @@
     
     <groupId>org.usadellab</groupId>
     <artifactId>trimmomatic</artifactId>
-    <version>0.41</version>
+    <version>0.42</version>
     <packaging>jar</packaging>
     
     <properties>
@@ -67,6 +67,35 @@
         	</resource>
     	</resources>
         <plugins>
+            <!-- Capture git commit hash and dirty-state at build time so that
+                 -version always identifies the exact source revision used. -->
+            <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <version>9.0.1</version>
+                <executions>
+                    <execution>
+                        <id>git-revision</id>
+                        <goals><goal>revision</goal></goals>
+                        <phase>initialize</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <!-- Graceful fallback when building from a source tarball or a
+                         shallow clone that has no git metadata available. -->
+                    <failOnNoGitDirectory>false</failOnNoGitDirectory>
+                    <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
+                    <!-- We only need two properties; skip everything else for speed. -->
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>git.commit.id.abbrev</includeOnlyProperty>
+                        <includeOnlyProperty>git.dirty</includeOnlyProperty>
+                    </includeOnlyProperties>
+                    <!-- Don't write a separate git.properties file into the JAR. -->
+                    <generateGitPropertiesFile>false</generateGitPropertiesFile>
+                    <!-- Use the short (7-char) abbreviation. -->
+                    <abbrevLength>7</abbrevLength>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

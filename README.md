@@ -40,13 +40,13 @@ The easiest option is to download a binary release zip, and unpack it somewhere 
 For standard cleaning of Illumina data, you can now invoke Trimmomatic with just the input files. Output files will be created in the same folder as the input files and named automatically (appending `.trimmed.fq.gz` for single read files or `.trimmed.paired.fq.gz` & `.trimmed.unpaired.fq.gz` for paired end read files), and standard trimming steps will be applied — `ILLUMINACLIP:TruSeq3-SE-GGGGG.fa:2:30:10` (TruSeq3 single-end adapters plus a polyG sequence for NovaSeq two-colour chemistry) for single-end input, or `ILLUMINACLIP:TruSeq3-PE-2-GGGGG.fa:2:30:10` (TruSeq3 paired-end adapters plus a polyG sequence) for paired-end input — followed by `SLIDINGWINDOW:4:20 MINLEN:36`. This mode also automatically detects and uses all available processor threads.
 
 ```bash
-java -jar Trimmomatic-0.41.jar input.fq.gz
+java -jar Trimmomatic-0.42.jar input.fq.gz
 ```
 
 or
 
 ```bash
-java -jar Trimmomatic-0.41.jar input_R1.fq.gz input_R2.fq.gz
+java -jar Trimmomatic-0.42.jar input_R1.fq.gz input_R2.fq.gz
 ```
 
 #### Note for HPC users (SGE, SLURM, LSF, PBS)
@@ -57,10 +57,10 @@ The recommended fix is to combine `MALLOC_ARENA_MAX=2` (prevents the virtual mem
 
 | Scheduler | Recommended invocation |
 |-----------|------------------------|
-| SGE       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NSLOTS -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
-| SLURM     | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$SLURM_CPUS_PER_TASK -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
-| LSF       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$LSB_DJOB_NUMPROC -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
-| PBS/Torque | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NCPUS -jar Trimmomatic-0.41.jar R1.fq.gz R2.fq.gz` |
+| SGE       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NSLOTS -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
+| SLURM     | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$SLURM_CPUS_PER_TASK -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
+| LSF       | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$LSB_DJOB_NUMPROC -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
+| PBS/Torque | `export MALLOC_ARENA_MAX=2`<br>`java -XX:ActiveProcessorCount=$NCPUS -jar Trimmomatic-0.42.jar R1.fq.gz R2.fq.gz` |
 
 `MALLOC_ARENA_MAX=2` alone prevents the crash but does not fix the thread count — without `-XX:ActiveProcessorCount`, simplified invocation will still attempt to use the full node CPU count. Memory requirements with the correct thread count: ~8 GiB for single-end, ~16 GiB for paired-end on large datasets.
 
@@ -77,7 +77,7 @@ You often don't need leading and trailing clipping. Also in general setting the 
 If you have questions please don't hesitate to contact us, this is not necessarily one size fits all. (e.g. RNAseq expression analysis vs DNA assembly).
 
 ```bash
-java -jar Trimmomatic-0.41.jar PE \
+java -jar Trimmomatic-0.42.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -87,7 +87,7 @@ ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36
 for reference only (less sensitive for adapters):
 
 ```bash
-java -jar Trimmomatic-0.41.jar PE \
+java -jar Trimmomatic-0.42.jar PE \
 input_forward.fq.gz input_reverse.fq.gz \
 output_forward_paired.fq.gz output_forward_unpaired.fq.gz \
 output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz \
@@ -107,7 +107,7 @@ This will perform the following:
 To perform the same steps using a single-ended adapter file, run:
 
 ```bash
-java -jar Trimmomatic-0.41.jar SE \
+java -jar Trimmomatic-0.42.jar SE \
 input.fq.gz \
 output.fq.gz \
 ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 \
@@ -196,7 +196,15 @@ java -classpath <path to trimmomatic jar> org.usadellab.trimmomatic.TrimmomaticS
 * `-compressStream` | `-compressBlock`: specifies the compression mode. Block compression is the default.
 * `-quiet`: suppresses progress output to the console.
 * `-verbose`: enables detailed reporting of adapter removal statistics when using the ILLUMINACLIP step.
-* `-version`: prints the Trimmomatic version number to the console.
+* `-version`: prints the Trimmomatic version number to the console. When built from a git working tree the output includes the abbreviated commit hash and a `-dirty` suffix if uncommitted changes are present (e.g. `0.42+b49a43e`).
+* `-interleaved` *(PE only)*: treat the single input file as an interleaved FASTQ containing alternating R1 / R2 records. Only one input file is required; the four standard output files are still produced.
+* `-longread` *(SE and PE)*: skip the 10 000-record phred quality-encoding pre-read and assume Phred+33. Recommended for all ONT and PacBio inputs where the pre-read would otherwise read up to 4 MB of data unnecessarily.
+* `-technicalread <1|2>` *(PE only)*: designate one read as the **technical read** (cell barcode / UMI) that must pass through completely untouched. All trimming steps run only on the other (**biological**) read. If the biological read is dropped, both reads are discarded — the technical read **never** appears in the unpaired output file. Use `1` when R1 carries the barcode/UMI (e.g. 10x Genomics, Drop-seq), or `2` when the roles are swapped. Example:
+  ```
+  TrimmomaticPE -technicalread 1 R1.fastq.gz R2.fastq.gz \
+    R1_paired.fastq.gz /dev/null R2_paired.fastq.gz R2_unpaired.fastq.gz \
+    ILLUMINACLIP:adapters/TruSeq3-PE.fa:2:30:10 SLIDINGWINDOW:4:20 MINLEN:30
+  ```
 
 ---
 
@@ -222,6 +230,12 @@ The current trimming steps are:
 * `MAXLEN`: Drop the read if it is longer than a specified length.
 * `AVGQUAL`: Drop the read if its average quality is below a specified threshold.
 * `BASECOUNT`: Drop the read if the count of a specified base (or bases) is outside a given minimum and maximum.
+* `POLYX`: Trim a homopolymer run from the 3' end; drop the read if it consists entirely of that base.
+* `LOWCOMPLEXITY`: Drop the read if its Shannon entropy (over A/C/G/T frequencies, N excluded) is below a minimum.
+* `UMIEXTRACT`: Extract a UMI from the 5' end and append it to the read name.
+* `MAXAMBIG`: Drop the read if the fraction of N bases exceeds a maximum.
+* `LONGREADCLIP`: Trim adapter residuals from both the 5' and 3' ends of long reads using Hamming distance (no indels). Adapters loaded from a FASTA file; both orientations are checked automatically. **Single-end mode only.**
+* `LONGREADSPLIT`: Detect chimeric long reads by scanning the read interior for internal adapter sequences using k-mer seeding and Hamming distance. Splits chimeric reads into independent fragments, each of which then passes through subsequent steps. **Single-end mode only.**
 * `TOPHRED33`: Convert quality scores to Phred-33.
 * `TOPHRED64`: Convert quality scores to Phred-64.
 
@@ -275,6 +289,59 @@ Most steps take one or more settings, delimited by `:`.
     * `bases`: specifies the string of characters to be counted (e.g., `N`, `GC`).
     * `minCount`: (optional) the minimum number of times the `bases` must appear for the read to be kept.
     * `maxCount`: (optional) the maximum number of times the `bases` are allowed to appear.
+
+* `POLYX:<base>:<minLength>`
+    * `base`: the nucleotide to look for at the 3' end (A, C, G, T, or N).
+    * `minLength`: the minimum run length required to trigger trimming. If the entire read is poly-X, it is dropped.
+    * Example: `POLYX:A:10` trims polyA tails of ≥10 bases; `POLYX:G:10` removes polyG artefacts from two-colour Illumina chemistry.
+
+* `LOWCOMPLEXITY:<minEntropy>`
+    * `minEntropy`: the minimum acceptable Shannon entropy calculated over A/C/G/T base frequencies (N bases are excluded). Entropy ranges from 0.0 (single-base homopolymer) to 2.0 (perfectly uniform ACGT). Reads with entropy **strictly below** the threshold are dropped.
+    * Recommended values: `1.5` to aggressively drop di-nucleotide repeats (e.g. ATAT…); `1.0` to retain them while still dropping homopolymers; `0.5` for a very lenient filter.
+    * Example: `LOWCOMPLEXITY:1.0`
+
+* `UMIEXTRACT:<length>[:<separator>]`
+    * `length`: the number of bases to extract from the 5' end as the UMI.
+    * `separator`: (optional) the string used to separate the original read name and the UMI tag [default = `_`].
+    * The extracted UMI is appended to the read name as `<separator>UMI:<bases>` and removed from the sequence. For paired-end single-cell protocols (10x Genomics, Drop-seq), apply only to R1.
+    * Example: `UMIEXTRACT:12` → name becomes `@readname_UMI:ACGTACGTACGT`; `UMIEXTRACT:10:__` uses `__` as separator.
+
+* `MAXAMBIG:<maxFraction>`
+    * `maxFraction`: the maximum allowed fraction of N bases in the read (0.0–1.0). Reads exceeding this fraction are dropped.
+    * Example: `MAXAMBIG:0.1` drops any read with more than 10% N bases.
+
+* `LONGREADCLIP:<fasta>:<maxErrorRate>[:<minOverlap>]`
+    * `fasta`: path to a FASTA file containing adapter sequences. Both forward and reverse-complement orientations are loaded automatically.
+    * `maxErrorRate`: the maximum fraction of mismatches allowed in a matching overlap (e.g. `0.10` allows 1 mismatch per 10 bp). N bases in either the read or the adapter are treated as wildcards and are never counted as mismatches.
+    * `minOverlap`: (optional) the minimum number of overlapping bases required to call an adapter match [default = 10].
+    * Trims adapter residuals from **both the 5' and 3' ends**. At the 3' end the adapter prefix is matched against the read suffix; at the 5' end the adapter suffix is matched against the read prefix. The longest valid overlap wins at each end. Reads reduced to zero length are dropped. **Single-end mode only.**
+    * Example: `LONGREADCLIP:adapters/ONT-LSK114.fa:0.10:10` — ONT R10.4.1 / Kit 14 reads.
+    * Example: `LONGREADCLIP:adapters/PacBio-Sequel.fa:0.15` — PacBio Sequel / SequelII / Revio reads with relaxed error rate.
+    * Trimmomatic ships adapter files for the most common long-read platforms in the `adapters/` directory:
+
+| File | Platform / Chemistry | Recommended `maxErrorRate` |
+|------|----------------------|---------------------------|
+| `adapters/ONT-LSK108-LSK110.fa` | Oxford Nanopore SQK-LSK108, LSK109, LSK110 (R9.4 / R9.4.1) | `0.15` (R9 chemistry has higher indel noise) |
+| `adapters/ONT-LSK112.fa` | Oxford Nanopore SQK-LSK112 (R10.3) | `0.10` |
+| `adapters/ONT-LSK114.fa` | Oxford Nanopore SQK-LSK114, LSK114-24 (R10.4.1 / Kit 14) | `0.10` |
+| `adapters/ONT-Rapid.fa` | Oxford Nanopore RAD004, RAD114, RBK004, RBK114 (Rapid kits) | `0.15` for RAD004/RBK004 (R9); `0.10` for RAD114/RBK114 (R10) |
+| `adapters/ONT-cDNA.fa` | Oxford Nanopore SQK-PCS109, PCS114 (direct cDNA / PCR-cDNA) | `0.15` for PCS109 (R9); `0.10` for PCS114 (R10) |
+| `adapters/PacBio-RSII.fa` | PacBio RS II — SMRTbell adapter (NGB00972.1) + C2 sequencing primer | `0.15` (CLR reads) |
+| `adapters/PacBio-Sequel.fa` | PacBio Sequel, SequelII, SequelIIe, Revio, ETK2.0 — SMRTbell adapter + C2 primer | `0.05` for HiFi/CCS; `0.15` for CLR |
+
+    * **Note:** Adapter chemistry evolves with each new kit generation. For kits not listed above, consult your platform's official documentation or community-curated sources such as [Porechop](https://github.com/rrwick/Porechop/blob/master/porechop/adapters.py) (ONT) and the [PacBio SMRTbell adapter documentation](https://www.pacb.com/documentation/).
+
+* `LONGREADSPLIT:<fasta>:<maxErrorRate>[:<minOverlap>[:<minFragmentLength>]]`
+    * `fasta`: path to a FASTA file containing adapter sequences (same file as used for `LONGREADCLIP`). Both forward and reverse-complement orientations are loaded automatically.
+    * `maxErrorRate`: the maximum fraction of mismatches allowed in a confirmed internal adapter match. Use the same value as for `LONGREADCLIP`.
+    * `minOverlap`: (optional) the minimum number of adapter bases that must match to call a chimera [default = 10]. Also defines the **terminal zone**: matches whose start position falls within this many bases of either end are ignored — those are handled by `LONGREADCLIP`.
+    * `minFragmentLength`: (optional) fragments shorter than this after splitting are discarded rather than emitted [default = 100].
+    * Internal adapter hits are found using **k-mer seeding** (8-mer index) followed by Hamming-distance verification, making the scan efficient even for very long reads. All hits in a single read are detected in one pass; reads with more than one internal adapter produce three or more fragments.
+    * Split fragments are renamed by appending `/splitNofM` to the original read name (e.g. `@read1/split1of2`, `@read1/split2of2`). Each fragment passes independently through all subsequent trimming steps.
+    * **Single-end mode only.** Raises an error if invoked in paired-end mode, as no current long-read platform (ONT, PacBio) produces paired-end data.
+    * Recommended pipeline order: `LONGREADSPLIT` → `LONGREADCLIP` → `MINLEN`
+    * Example: `LONGREADSPLIT:adapters/ONT-LSK114.fa:0.10` — detect and split ONT chimeras with default overlap and fragment-length thresholds.
+    * Example: `LONGREADSPLIT:adapters/ONT-LSK114.fa:0.10:10:200` — require ≥10 bp adapter overlap and discard fragments shorter than 200 bp.
 
 * `TOPHRED33`
 

@@ -24,7 +24,22 @@ public class Trimmomatic {
 			Properties props = new Properties();
 			props.load(is);
 
-			System.out.println(props.getProperty("version"));
+			String version = props.getProperty("version");
+			String hash    = props.getProperty("build.hash", "");
+			String dirty   = props.getProperty("build.dirty", "false");
+
+			// The placeholder is only substituted when the git-commit-id plugin runs
+			// successfully.  If it didn't (source tarball, no git history, etc.) the
+			// raw Maven placeholder string is left in the file — skip it in that case.
+			StringBuilder sb = new StringBuilder(version);
+			if (!hash.isEmpty() && !hash.startsWith("${")) {
+				sb.append('+').append(hash);
+				if ("true".equalsIgnoreCase(dirty)) {
+					sb.append("-dirty");
+				}
+			}
+
+			System.out.println(sb);
 		} catch (Exception e) {
 			throw new RuntimeException("Unable to determine version", e);
 		}
